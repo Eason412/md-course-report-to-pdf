@@ -18,6 +18,7 @@ Follow this workflow to turn one Chinese Markdown course report into a polished 
    - Check Markdown/HTML image links with `grep -nE '^!\[|<img'`.
    - Keep image paths relative to the Markdown/LaTeX project root.
    - Treat Markdown `#` as the report title and Markdown `##` as body section headings after the title. For this numbered template, prefer headings without manual numeric prefixes, so LaTeX can generate section, figure, table, and equation numbers consistently.
+   - Do not feed page-by-page lecture notes or slide drafts directly into this course-report path. If the source contains many headings such as `## 第 1 页｜...` plus `屏幕：` / `讲：` / `图：`, first rewrite it into a formal report with abstract, chapter sections, body prose, figures/tables, and references. Only pass `--allow-slide-draft` when the user explicitly wants a raw slide-note PDF.
    - Extract Chinese and English abstracts from the source into template metadata (`abstract_zh`, `keywords_zh`, `abstract_en`, `keywords_en`) and remove those abstract sections from the generated body. The final order must be cover, abstracts, TOC, then body.
    - Keep level-1 chapter headings short and summary-style; avoid long sentence headings unless the source/template requires them.
    - Enforce user/school limits such as keyword count before conversion.

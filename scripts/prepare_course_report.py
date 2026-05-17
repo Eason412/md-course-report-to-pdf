@@ -20,6 +20,8 @@ CITATION_RE = re.compile(r"(?<!\{)[\[［]([\d,\-\s，、–—]+)[\]］]")
 REFERENCE_LABEL_RE = re.compile(r"(?m)^\s*(?:[\[［](\d+)[\]］]|(\d+)[.、])\s+")
 INVALID_TABLE_CAPTION_RE = re.compile(r"^\s*(?:表|图|Table|Figure)\s*[：:]\s+\S+", re.I)
 LINK_DEFINITION_RE = re.compile(r"^\s*\[[^\]]+\]:")
+SLIDE_PAGE_HEADING_RE = re.compile(r"^##\s*第\s*\d+\s*页\s*[｜|:：]")
+SLIDE_FIELD_RE = re.compile(r"^(?:屏幕|讲|图|手工反应式)\s*[：:]")
 
 
 def normalize_heading(text: str) -> str:
@@ -37,13 +39,13 @@ def is_url_path(path: str) -> bool:
     return parsed.scheme in {"http", "https"}
 
 
-def resolve_project_asset(path: str, source_dir: Path) -> tuple[str, bool, bool]:
+def resolve_project_asset(path: str, source_dir: Path, allow_absolute: bool = False) -> tuple[str, bool, bool]:
     cleaned = path.strip().strip("<>")
     if not cleaned or is_url_path(cleaned):
         return cleaned, False, False
     candidate = Path(cleaned)
     if candidate.is_absolute():
-        return cleaned, candidate.exists(), False
+        return cleaned, candidate.exists(), allow_absolute
     resolved = candidate if candidate.is_absolute() else source_dir / candidate
     try:
         resolved_path = resolved.resolve()
@@ -121,6 +123,20 @@ def split_reference_section(body: str) -> tuple[str, str]:
         if idx >= max(0, int(len(lines) * 0.75)):
             return "\n".join(lines[:idx]), "\n".join(lines[idx:])
     return body, ""
+
+
+def detect_slide_draft(lines: list[str]) -> dict[str, object]:
+    """Detect page-by-page PPT drafts that are not course-report sources."""
+    page_heading_count = sum(1 for line in lines if SLIDE_PAGE_HEADING_RE.match(line.strip()))
+    slide_field_count = sum(1 for line in lines if SLIDE_FIELD_RE.match(line.strip()))
+    text_fence_count = sum(1 for line in lines if line.strip() == "```text")
+    detected = page_heading_count >= 3 and slide_field_count >= 6
+    return {
+        "detected": detected,
+        "page_heading_count": page_heading_count,
+        "slide_field_count": slide_field_count,
+        "text_fence_count": text_fence_count,
+    }
 
 
 def expand_numeric_markers(markers: list[str]) -> list[int]:
@@ -560,10 +576,12 @@ def main() -> int:
     parser.add_argument("--student-id", default="")
     parser.add_argument("--logo", default="")
     parser.add_argument("--no-cover", action="store_true")
+    parser.add_argument("--allow-slide-draft", action="store_true")
     args = parser.parse_args()
 
     source = args.source
     lines = source.read_text(encoding="utf-8").splitlines()
+    slide_draft = detect_slide_draft(lines)
     no_abs_lines, metadata, warnings = extract_abstract(lines)
     body_lines, title, body_warnings = prepare_body(no_abs_lines)
     warnings.extend(body_warnings)
@@ -592,6 +610,16 @@ def main() -> int:
     prepared_body = prepared_body.strip() + "\n"
     qa = scan_body(prepared_body, source.parent)
     qa["citation_dedup"] = citation_dedup
+    qa["probable_slide_draft"] = {
+        **slide_draft,
+        "allowed": args.allow_slide_draft,
+    }
+    if slide_draft["detected"] and not args.allow_slide_draft:
+        warnings.append(
+            "输入看起来是逐页讲稿或幻灯片内容稿（如“第 X 页”“屏幕：”“讲：”“图：”），"
+            "不是正式课程报告 Markdown；请先改写成摘要、章节正文和参考文献结构，"
+            "或确认后使用 --allow-slide-draft 强制转换。"
+        )
     if qa["missing_images"]:
         warnings.append("存在缺失图片：" + ", ".join(qa["missing_images"]))
     if qa["captions_with_manual_numbers"]:
@@ -608,7 +636,11 @@ def main() -> int:
         warnings.append("表题与 Markdown 表格之间存在空行；Pandoc 可能不会把它识别为表题。")
     if qa["table_captions_with_manual_numbers"]:
         warnings.append("表题含手写编号，可能与 LaTeX 自动编号重复。")
-    logo_path, logo_exists, logo_inside_project = resolve_project_asset(args.logo, source.parent) if args.logo else ("", False, False)
+    logo_path, logo_exists, logo_inside_project = (
+        resolve_project_asset(args.logo, source.parent, allow_absolute=True)
+        if args.logo
+        else ("", False, False)
+    )
     if args.logo and not logo_exists:
         warnings.append(f"logo 文件不存在：{args.logo}")
 

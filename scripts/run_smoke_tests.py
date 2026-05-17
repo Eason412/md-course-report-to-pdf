@@ -76,6 +76,8 @@ def render_case(source: Path, work_root: Path, compiler_available: bool) -> dict
     ]
     if not compiler_available:
         build_cmd.append("--skip-compile")
+    else:
+        build_cmd.extend(["--output-pdf", str(pdf_path)])
 
     built = run(build_cmd, case_dir)
     if built.returncode != 0:
@@ -375,6 +377,15 @@ def main() -> int:
                 work_root,
                 extra_args=["--output-pdf", str(work_root / "skip_compile_output_pdf" / "out.pdf")],
                 expect_prepare_failure=False,
+            ),
+            "slide_draft_input": render_negative_case(
+                "slide_draft_input",
+                "# 逐页内容稿\n\n"
+                "## 第 1 页｜标题\n\n屏幕：一句话。\n\n讲：讲稿。\n\n图：图片提示。\n\n"
+                "## 第 2 页｜标题\n\n屏幕：一句话。\n\n讲：讲稿。\n\n图：图片提示。\n\n"
+                "## 第 3 页｜标题\n\n屏幕：一句话。\n\n讲：讲稿。\n\n图：图片提示。\n",
+                "page-by-page lecture notes or a slide draft",
+                work_root,
             ),
         }
 

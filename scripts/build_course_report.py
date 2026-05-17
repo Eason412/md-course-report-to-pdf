@@ -31,6 +31,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--student-id", default="")
     parser.add_argument("--logo", default="")
     parser.add_argument("--no-cover", action="store_true")
+    parser.add_argument("--allow-slide-draft", action="store_true")
     parser.add_argument("--work-dir", type=Path, default=Path("latex"))
     parser.add_argument("--tex", type=Path, default=Path("course_report.tex"))
     parser.add_argument("--pdf", type=Path, default=Path("course_report.pdf"))
@@ -86,6 +87,16 @@ def validate_prepare_qa(report: dict[str, object]) -> list[str]:
         failures.append("image files are missing")
     if qa.get("unsafe_image_paths"):
         failures.append("image paths are absolute, remote, or outside the source Markdown directory")
+    slide_draft = qa.get("probable_slide_draft")
+    if (
+        isinstance(slide_draft, dict)
+        and slide_draft.get("detected") is True
+        and slide_draft.get("allowed") is not True
+    ):
+        failures.append(
+            "input looks like page-by-page lecture notes or a slide draft; rewrite it as a course report first "
+            "or pass --allow-slide-draft to force conversion"
+        )
     if cover.get("logo_path") and cover.get("logo_exists") is not True:
         failures.append("logo file is missing")
     if cover.get("logo_path") and cover.get("logo_inside_project") is not True:
@@ -240,6 +251,8 @@ def main() -> int:
         ]
         if args.no_cover:
             prepare_cmd.append("--no-cover")
+        if args.allow_slide_draft:
+            prepare_cmd.append("--allow-slide-draft")
         run(prepare_cmd, cwd=project_dir)
 
         prepare_report = work_dir / "prepare_report.json"
@@ -266,7 +279,7 @@ def main() -> int:
                 "--metadata-file",
                 str(metadata),
                 "--resource-path=.",
-                "--no-highlight",
+                "--syntax-highlighting=none",
                 "--output",
                 str(tex_path),
             ],
@@ -297,8 +310,9 @@ def main() -> int:
             if output_pdf:
                 if not pdf_path.exists():
                     raise RuntimeError(f"PDF was not found for copy: {pdf_path}")
-                output_pdf.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(pdf_path, output_pdf)
+                if output_pdf.resolve() != pdf_path.resolve():
+                    output_pdf.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(pdf_path, output_pdf)
             if not args.keep_intermediates:
                 cleanup_intermediates(tex_path, pdf_path)
 

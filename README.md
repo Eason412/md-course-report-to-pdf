@@ -221,6 +221,7 @@ latex/postprocess_qa.json      LaTeX 后处理 QA
 - `--output-pdf PATH`：额外复制最终 PDF 到指定路径。
 - `--keep-intermediates`：保留 `.aux`、`.log`、`.toc` 等 LaTeX 中间文件。
 - `--skip-compile`：只检查预处理、Pandoc 转换和后处理，不编译 PDF。该参数不能和 `--output-pdf` 同时使用。
+- `--allow-slide-draft`：强制转换逐页讲稿或幻灯片内容稿。默认会拦截这类输入，因为它通常缺少摘要、正式章节和参考文献，直接转换不像课程报告。
 
 重点 QA 字段：
 
@@ -232,6 +233,19 @@ latex/postprocess_qa.json      LaTeX 后处理 QA
 - `remaining_unnumbered_display_math`：是否仍有未编号展示公式。
 - `reference_urls`：参考文献中是否保留了不需要的 URL。
 - `cover_fields_use_makebox_centering`：封面字段是否居中。
+
+## 生成结果不像课程报告时 🔎
+
+如果生成的 PDF 有封面和目录，但正文看起来像逐页讲稿、提纲打印稿或提示词清单，通常不是模板坏了，而是源 Markdown 没有按课程报告结构组织。常见问题包括：
+
+- 源文件使用了 `## 第 1 页｜...`、`屏幕：`、`讲：`、`图：` 这类逐页讲稿写法，而不是 `## 摘要`、`## 1. 引言`、`## 2. ...` 这样的报告章节。
+- 缺少 `## 摘要`、`## Abstract`、关键词和 `## 参考文献`，导致 PDF 只剩封面、目录和正文，没有完整前置页与参考文献页。
+- 图片只写成“图：这里放某某图”或保留 AI 画图提示词，没有使用 `![图题](image/xxx.png)` 这种 Markdown 图片语法，所以 PDF 不会真正插入图片。
+- 表格没有用 Markdown pipe table，或表格后没有紧跟 `: 表题`，因此不会生成标准编号表格。
+- 正文保留了很长的代码块、绘图 prompt 或内部备注，LaTeX 会把它们排进 PDF，严重时还会造成横向溢出。
+- 目录条目异常密集、全是“第 X 页”，通常说明输入是逐页稿；应先改写为正式报告，再转换。
+
+正确做法是先把源文件整理成“标题、摘要、英文摘要、章节正文、图表、参考文献”的 Markdown 报告结构，再运行转换。只有在你明确想把逐页讲稿原样打印成 PDF 时，才使用 `--allow-slide-draft`。
 
 ## 测试 ✅
 
