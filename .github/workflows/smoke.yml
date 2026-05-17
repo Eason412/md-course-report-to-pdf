@@ -22,7 +22,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends pandoc fonts-noto-cjk
 
       - name: Cache Tectonic packages
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.cache/Tectonic
           key: ${{ runner.os }}-tectonic-${{ hashFiles('assets/templates/**/*.tex', 'examples/**/*.md') }}
