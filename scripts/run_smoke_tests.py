@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -170,6 +171,17 @@ def render_case(source: Path, work_root: Path, compiler_available: bool) -> dict
         check(r"\endfoot" in table_block and r"\endlastfoot" in table_block, "longtable must define foot and lastfoot", errors)
         check(r"\multicolumn{1}{c}{方案}" in table_block, "plain longtable header cells must be centered", errors)
 
+    if compiler_available:
+        check(pdf_path.exists(), "compiled PDF must exist", errors)
+        check(pdf_path.exists() and pdf_path.stat().st_size > 0, "compiled PDF must be nonempty", errors)
+
+    if source.name == "标准课程报告模板.md":
+        check(qa.get("image_count") == 0, "standard template must not reference a missing live image", errors)
+        check(qa.get("pipe_table_count") == 1, "standard template pipe_table_count must be 1", errors)
+        check(qa.get("table_caption_count") == 1, "standard template table_caption_count must be 1", errors)
+        check(qa.get("citation_numbers") == [1, 2, 3], "standard template citations must be [1, 2, 3]", errors)
+        check(qa.get("reference_numbers") == [1, 2, 3], "standard template references must be [1, 2, 3]", errors)
+
     return {
         "ok": not errors,
         "errors": errors,
@@ -200,12 +212,13 @@ def render_case(source: Path, work_root: Path, compiler_available: bool) -> dict
         "pdf": {
             "attempted": compiler_available,
             "exists": pdf_path.exists() if compiler_available else None,
+            "nonempty": pdf_path.stat().st_size > 0 if compiler_available and pdf_path.exists() else None,
         },
         "build": build_summary,
     }
 
 
-def render_no_cover_case(source: Path, work_root: Path) -> dict[str, object]:
+def render_no_cover_case(source: Path, work_root: Path, compiler_available: bool) -> dict[str, object]:
     case_dir = work_root / "no_cover"
     case_dir.mkdir(parents=True)
     copied_source = case_dir / source.name
@@ -213,20 +226,22 @@ def render_no_cover_case(source: Path, work_root: Path) -> dict[str, object]:
 
     latex_dir = case_dir / "latex"
     tex = case_dir / "report.tex"
-    built = run(
-        [
-            sys.executable,
-            str(BUILD),
-            str(copied_source),
-            "--no-cover",
-            "--skip-compile",
-            "--work-dir",
-            str(latex_dir),
-            "--tex",
-            str(tex),
-        ],
-        case_dir,
-    )
+    pdf_path = case_dir / "report.pdf"
+    build_cmd = [
+        sys.executable,
+        str(BUILD),
+        str(copied_source),
+        "--no-cover",
+        "--work-dir",
+        str(latex_dir),
+        "--tex",
+        str(tex),
+        "--pdf",
+        str(pdf_path),
+    ]
+    if not compiler_available:
+        build_cmd.append("--skip-compile")
+    built = run(build_cmd, case_dir)
     if built.returncode != 0:
         return fail("no-cover build failed", {"stdout": built.stdout, "stderr": built.stderr})
 
@@ -245,6 +260,9 @@ def render_no_cover_case(source: Path, work_root: Path) -> dict[str, object]:
     if isinstance(cover, dict):
         check(cover.get("enabled") is False, "cover.enabled must be false when --no-cover is used", errors)
     check(r"\begin{titlepage}" not in tex_text, "no-cover output must not contain a titlepage", errors)
+    if compiler_available:
+        check(pdf_path.exists(), "no-cover compiled PDF must exist", errors)
+        check(pdf_path.exists() and pdf_path.stat().st_size > 0, "no-cover compiled PDF must be nonempty", errors)
     return {"ok": not errors, "errors": errors, "build": build_summary}
 
 
@@ -312,6 +330,7 @@ def main() -> int:
         EXAMPLES / "table_report.md",
         EXAMPLES / "citation_report.md",
         EXAMPLES / "no_reference_report.md",
+        EXAMPLES / "标准课程报告模板.md",
     ]
     missing_sources = [str(path) for path in sources if not path.exists()]
     if missing_sources:
@@ -328,10 +347,14 @@ def main() -> int:
         return 1
 
     compiler_available = shutil.which("tectonic") is not None or shutil.which("xelatex") is not None
+    require_compiler = os.environ.get("MD_COURSE_REPORT_REQUIRE_COMPILER") == "1"
+    if require_compiler and not compiler_available:
+        print(json.dumps({"ok": False, "error": "compiler required but tectonic/xelatex not found"}, ensure_ascii=False))
+        return 1
     with tempfile.TemporaryDirectory(prefix="md-course-report-smoke-") as tmp:
         work_root = Path(tmp)
         cases = {source.name: render_case(source, work_root, compiler_available) for source in sources}
-        no_cover_case = render_no_cover_case(EXAMPLES / "minimal_report.md", work_root)
+        no_cover_case = render_no_cover_case(EXAMPLES / "minimal_report.md", work_root, compiler_available)
         negative_cases = {
             "table_missing_caption": render_negative_case(
                 "table_missing_caption",
@@ -376,6 +399,22 @@ def main() -> int:
                 "--output-pdf requires compilation",
                 work_root,
                 extra_args=["--output-pdf", str(work_root / "skip_compile_output_pdf" / "out.pdf")],
+                expect_prepare_failure=False,
+            ),
+            "bad_pdf_suffix": render_negative_case(
+                "bad_pdf_suffix",
+                "# 错误 PDF 后缀\n\n正文。\n",
+                "--pdf must end with .pdf",
+                work_root,
+                extra_args=["--pdf", str(work_root / "bad_pdf_suffix" / "out.md")],
+                expect_prepare_failure=False,
+            ),
+            "tex_overwrites_source": render_negative_case(
+                "tex_overwrites_source",
+                "# 输出覆盖源文件\n\n正文。\n",
+                "--tex must end with .tex",
+                work_root,
+                extra_args=["--tex", str(work_root / "tex_overwrites_source" / "tex_overwrites_source.md")],
                 expect_prepare_failure=False,
             ),
             "slide_draft_input": render_negative_case(

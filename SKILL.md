@@ -102,7 +102,7 @@ Use these defaults unless the user or a school template requires otherwise.
 ## Common Fixes
 
 - **Chinese path or `\input{...}` fails**: keep `--tex`, `--work-dir`, and generated intermediates ASCII-named.
-- **Image not found**: compile from the project root, or update `\graphicspath{{./}{image/}{assets/}}`.
+- **Image not found**: compile from the project root, or update `\graphicspath{{./}{image/}{figures/}{assets/}}`.
 - **Caption duplicates “图 1 图 1”**: remove manual figure numbers from Markdown alt text and nearby handwritten figure-title paragraphs.
 - **Table is not numbered**: add a Pandoc table caption line such as `: 方案对比` immediately after the pipe table with no blank line.
 - **Long table breaks across pages without a bottom rule or continued heading**: check `longtables_missing_endfoot == 0`, `longtables_missing_continued_caption == 0`, and `longtable_headers_centered == true` in `postprocess_qa.json`.

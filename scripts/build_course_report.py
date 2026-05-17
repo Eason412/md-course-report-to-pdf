@@ -81,6 +81,13 @@ def is_within(path: Path, parent: Path) -> bool:
     return True
 
 
+def validate_output_path(path: Path, source: Path, expected_suffix: str, option: str) -> None:
+    if path.suffix.lower() != expected_suffix:
+        raise RuntimeError(f"{option} must end with {expected_suffix}: {path}")
+    if path.resolve() == source.resolve():
+        raise RuntimeError(f"{option} must not overwrite the source Markdown: {path}")
+
+
 def relative_project_path(path: Path, project_dir: Path) -> str:
     try:
         return str(path.resolve().relative_to(project_dir.resolve()))
@@ -231,6 +238,10 @@ def main() -> int:
         tex_path = project_path(args.tex, project_dir)
         pdf_path = project_path(args.pdf, project_dir)
         output_pdf = project_path(args.output_pdf, project_dir) if args.output_pdf else None
+        validate_output_path(tex_path, source, ".tex", "--tex")
+        validate_output_path(pdf_path, source, ".pdf", "--pdf")
+        if output_pdf:
+            validate_output_path(output_pdf, source, ".pdf", "--output-pdf")
         if not is_within(tex_path, project_dir):
             raise RuntimeError(
                 "--tex must be inside the source Markdown directory so relative images compile; "

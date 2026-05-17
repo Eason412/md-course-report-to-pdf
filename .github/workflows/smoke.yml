@@ -21,8 +21,24 @@ jobs:
       - name: Install Pandoc
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends pandoc
 
+      - name: Cache Tectonic packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/Tectonic
+          key: ${{ runner.os }}-tectonic-${{ hashFiles('assets/templates/**/*.tex', 'examples/**/*.md') }}
+          restore-keys: |
+            ${{ runner.os }}-tectonic-
+
+      - name: Set up Tectonic
+        uses: wtfjoke/setup-tectonic@v4
+
+      - name: Check PDF compiler
+        run: tectonic --version
+
       - name: Check Python syntax
         run: python3 -m py_compile scripts/*.py
 
       - name: Run smoke tests
+        env:
+          MD_COURSE_REPORT_REQUIRE_COMPILER: "1"
         run: python3 scripts/run_smoke_tests.py

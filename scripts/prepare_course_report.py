@@ -532,8 +532,10 @@ def scan_pipe_tables(lines: list[str]) -> dict[str, object]:
 
 def scan_body(body: str, source_dir: Path) -> dict[str, object]:
     lines = body.splitlines()
-    markdown_images = re.findall(r"!\[[^\]]*\]\(([^)]+)\)", body)
-    html_images = re.findall(r"<img\b[^>]*\bsrc=['\"]([^'\"]+)['\"]", body, flags=re.I)
+    protected = protected_line_indexes(lines)
+    scan_text = "\n".join("" if idx in protected else line for idx, line in enumerate(lines))
+    markdown_images = re.findall(r"!\[[^\]]*\]\(([^)]+)\)", scan_text)
+    html_images = re.findall(r"<img\b[^>]*\bsrc=['\"]([^'\"]+)['\"]", scan_text, flags=re.I)
     images = markdown_images + html_images
     image_items = []
     for image in images:
@@ -542,7 +544,7 @@ def scan_body(body: str, source_dir: Path) -> dict[str, object]:
 
     captions_with_numbers = [
         caption
-        for caption in re.findall(r"!\[([^\]]+)\]\([^)]+\)", body)
+        for caption in re.findall(r"!\[([^\]]+)\]\([^)]+\)", scan_text)
         if re.match(r"\s*[图表]\s*\d+", caption)
     ]
     table_qa = scan_pipe_tables(lines)

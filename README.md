@@ -5,6 +5,8 @@
 </p>
 
 > 如果你在使用中遇到格式问题、构建失败、学校模板适配需求，或有更好的排版、QA、工作流建议，欢迎提交 GitHub Issue，也可以发邮件到 `huyi@njust.edu.cn`。邮件标题建议注明来意，例如 `md-course-report-to-pdf 使用反馈`、`课程报告 PDF 格式建议` 或 `Codex skill 改进建议`。
+>
+> 本项目为个人维护的开源工具，不是南京理工大学官方模板或官方支持渠道；正式提交前请以学校、学院或任课教师的当前要求为准。
 
 [![Smoke Test](https://github.com/Eason412/md-course-report-to-pdf/actions/workflows/smoke.yml/badge.svg)](https://github.com/Eason412/md-course-report-to-pdf/actions/workflows/smoke.yml)
 
@@ -199,7 +201,7 @@ Keywords: keyword one; keyword two; keyword three
 
 ### 表格
 
-推荐使用 Markdown pipe table，并在表格后紧跟 Pandoc 表题，中间不要空行。
+推荐使用 Markdown pipe table，并在表格后紧跟 Pandoc 表题，中间不要空行。Markdown 源文件里表题写在表格后面，最终 PDF 会把表题渲染到表格上方。
 
 ```markdown
 | 方案 | 优势 | 约束 |
@@ -279,7 +281,7 @@ python3 scripts/run_smoke_tests.py
 python3 -m py_compile scripts/*.py
 ```
 
-smoke test 会渲染仓库示例、校验 JSON QA，并在本机存在 `tectonic` 或 `xelatex` 时编译 PDF。GitHub Actions 会在干净环境中运行跨平台 smoke test 和 Python 语法检查。
+smoke test 会渲染仓库示例、校验 JSON QA，并在本机存在 `tectonic` 或 `xelatex` 时编译 PDF。GitHub Actions 会安装 Tectonic，并强制覆盖真实 PDF 编译路径。
 
 ## 仓库结构
 
@@ -314,6 +316,6 @@ scripts/run_smoke_tests.py         smoke test 运行器
 
 ## 开源说明
 
-代码、模板、示例和文档使用 MIT License 开源。
+代码、脚本、示例 Markdown 和仓库文档使用 MIT License 开源。
 
-`assets/njust_logo.png` 用于 README 展示和默认封面 logo。南京理工大学校徽及相关标识权利归属原权利人，不属于 MIT License 授权范围。用户自行提供的 logo、校徽或其他第三方素材也不包含在本许可证范围内。
+`assets/njust_logo.png` 用于 README 展示和默认封面 logo，`references/njust-thesis-format.doc` 用作格式参考文件。南京理工大学校徽、学校官方格式文件及相关标识权利归属原权利人，不属于 MIT License 授权范围。用户自行提供的 logo、校徽或其他第三方素材也不包含在本许可证范围内。
