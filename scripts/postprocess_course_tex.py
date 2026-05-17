@@ -1,0 +1,217 @@
+#!/usr/bin/env python3
+"""Postprocess Pandoc LaTeX for the course-report template."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import re
+from pathlib import Path
+
+
+REF_SENTINEL = "% COURSE_REPORT_REFERENCES_BEGIN"
+REF_MARKER = r"\section*{\centering\zihao{3}\songti\bfseries 参考文献}"
+REF_HEADING_RE = re.compile(
+    r"(?:\\clearpage\s*)?\\section\*?\{(?:\\centering\\zihao\{3\}\\songti\\bfseries\s*)?参考文献\}",
+    re.S,
+)
+RAW_CITATION_TEX_RE = re.compile(r"\{\[\}([^{}]+?)\{\]\}")
+
+
+def split_references(tex: str) -> tuple[str, str]:
+    pos = tex.find(REF_SENTINEL)
+    if pos == -1:
+        match = REF_HEADING_RE.search(tex)
+        if not match:
+            return tex, ""
+        pos = match.start()
+    return tex[:pos], tex[pos:]
+
+
+def convert_citations(body: str) -> str:
+    citation_group = re.compile(r"(?:\{\[\}([\d,\-\s，、–—]+)\{\]\}\s*)+")
+
+    def repl(match: re.Match[str]) -> str:
+        nums = re.findall(r"\{\[\}([\d,\-\s，、–—]+)\{\]\}", match.group(0))
+        cleaned = ",".join(
+            part.strip().replace(" ", "").replace("，", ",").replace("、", ",").replace("–", "-").replace("—", "-")
+            for part in nums
+            if part.strip()
+        )
+        return r"\textsupcite{" + cleaned + "}"
+
+    return citation_group.sub(repl, body)
+
+
+def number_display_math(body: str) -> str:
+    pattern = re.compile(r"\\\[(.*?)\\\]", re.S)
+
+    def repl(match: re.Match[str]) -> str:
+        content = match.group(1).strip()
+        if not content:
+            return match.group(0)
+        if r"\begin{" in content or r"\tag{" in content:
+            return match.group(0)
+        return "\\begin{equation}\n" + content + "\n\\end{equation}"
+
+    return pattern.sub(repl, body)
+
+
+def center_longtable_headers(tex: str) -> str:
+    def center_plain_header_row(row: str) -> str:
+        if r"\begin{minipage}" in row or r"\multicolumn" in row:
+            return row
+        line = row.rstrip()
+        if not line.endswith(r"\\") or "&" not in line:
+            return row
+        cells = [cell.strip() for cell in line[:-2].split("&")]
+        centered = " & ".join(r"\multicolumn{1}{c}{" + cell + "}" for cell in cells) + r" \\"
+        return centered + ("\n" if row.endswith("\n") else "")
+
+    def center_plain_headers(block: str) -> str:
+        def row_repl(match: re.Match[str]) -> str:
+            return match.group(1) + center_plain_header_row(match.group(2)) + match.group(3)
+
+        return re.sub(
+            r"(\\toprule\\noalign\{\}\n)(.*?\\\\\n)(\\midrule\\noalign\{\})",
+            row_repl,
+            block,
+            flags=re.S,
+        )
+
+    def repl(match: re.Match[str]) -> str:
+        block = match.group(0)
+        if r"\endfirsthead" not in block and r"\endhead" not in block:
+            return block
+        head_end_positions = [
+            pos
+            for pos in (block.find(r"\endfirsthead"), block.find(r"\endhead"))
+            if pos != -1
+        ]
+        data_start = min(head_end_positions) if head_end_positions else len(block)
+        return (
+            block[:data_start].replace(r"\begin{minipage}[b]{\linewidth}\raggedright", r"\begin{minipage}[b]{\linewidth}\centering")
+            + block[data_start:]
+        )
+
+    centered = re.sub(r"\\begin\{longtable\}.*?\\end\{longtable\}", repl, tex, flags=re.S)
+    return re.sub(r"\\begin\{longtable\}.*?\\end\{longtable\}", lambda match: center_plain_headers(match.group(0)), centered, flags=re.S)
+
+
+def add_longtable_continuations(tex: str) -> str:
+    def repl(match: re.Match[str]) -> str:
+        block = match.group(0)
+        caption_match = re.search(r"\\caption\{([^{}]+)\}\\tabularnewline", block)
+        if not caption_match:
+            return block
+        caption = caption_match.group(1)
+        if r"\endfoot" not in block:
+            block = block.replace(
+                r"\endhead",
+                "\\endhead\n\\bottomrule\\noalign{}\n\\endfoot",
+                1,
+            )
+        if "（续表）" not in block:
+            block = block.replace(
+                r"\endfirsthead",
+                "\\endfirsthead\n\\caption[]{" + caption + "（续表）}\\tabularnewline",
+                1,
+            )
+        return block
+
+    return re.sub(r"\\begin\{longtable\}.*?\\end\{longtable\}", repl, tex, flags=re.S)
+
+
+def clean_reference_tail(refs: str) -> str:
+    if not refs:
+        return refs
+    refs = refs.replace(REF_SENTINEL + "\n", "")
+    refs = refs.replace(REF_MARKER + "\n\\addcontentsline", REF_MARKER + "\n\\phantomsection\n\\addcontentsline")
+    refs = re.sub(r"\\url\{https?://[^}]+\}", "", refs)
+    refs = re.sub(r"\s*https?://[^\s}]+", "", refs)
+    return refs
+
+
+def qa_report(tex: str, body: str, refs: str) -> dict[str, object]:
+    longtables = re.findall(r"\\begin\{longtable\}.*?\\end\{longtable\}", tex, flags=re.S)
+    toc_font_macro = re.search(r"\\newcommand\{\\reporttocfont\}\{.*?\\zihao\{([^}]+)\}", tex, flags=re.S)
+    section_toc_def = re.search(
+        r"\\renewcommand\*?\\l@section.*?(?=\\renewcommand\*?\\l@subsection)",
+        tex,
+        flags=re.S,
+    )
+    section_toc_text = section_toc_def.group(0) if section_toc_def else ""
+    if toc_font_macro and r"\reporttocfont\@dottedtocline" in tex:
+        toc_font_sizes = {toc_font_macro.group(1)}
+    else:
+        toc_font_sizes = set(
+            re.findall(r"\\renewcommand\*?\\l@(?:section|subsection|subsubsection|paragraph).*?\\zihao\{([^}]+)\}", tex, flags=re.S)
+        )
+    cover_uses_makebox = bool(r"\newcommand{\coverfield}" in tex and r"\makebox[\textwidth][c]" in tex)
+    return {
+        "references_section_found": bool(refs),
+        "body_has_abstract_section": bool(re.search(r"\\section\{(?:摘要|Abstract)\}", body)),
+        "remaining_raw_citations_before_references": RAW_CITATION_TEX_RE.findall(body),
+        "remaining_unnumbered_display_math": len(re.findall(r"\\\[", body)),
+        "equation_count": len(re.findall(r"\\begin\{equation\}", tex)),
+        "textsupcite_count": len(re.findall(r"\\textsupcite\{", body)),
+        "reference_labels": re.findall(r"\{\[\}(\d+)\{\]\}", refs),
+        "reference_urls": re.findall(r"https?://\S+", refs),
+        "dangling_url_macro": bool(re.search(r"\\url\{\s*(?:[,.;，。；、)]|\n|$)", refs)),
+        "longtable_count": len(longtables),
+        "booktabs_longtable_count": len(
+            [
+                table
+                for table in longtables
+                if all(rule in table for rule in (r"\toprule", r"\midrule", r"\bottomrule"))
+            ]
+        ),
+        "longtables_missing_caption": sum(1 for table in longtables if r"\caption{" not in table),
+        "longtables_missing_endfoot": sum(1 for table in longtables if r"\endfoot" not in table),
+        "longtables_missing_continued_caption": sum(1 for table in longtables if "（续表）" not in table),
+        "longtable_headers_centered": all(
+            (
+                r"\begin{minipage}[b]{\linewidth}\centering" in table
+                or r"\multicolumn{1}{c}{" in table
+            )
+            for table in longtables
+        ),
+        "table_captions_with_manual_numbers": re.findall(r"\\caption\{[表Table\s]*\d+(?:\.\d+)?[^}]*\}", tex),
+        "toc_uses_large_section_font": bool(r"\zihao{4}" in section_toc_text or r"\bfseries" in section_toc_text),
+        "toc_entry_font_sizes": sorted(toc_font_sizes),
+        "toc_uses_shared_numwidth": bool(r"\reporttocnumwidth" in tex),
+        "toc_page_width_configured": bool(re.search(r"\\def\\@pnumwidth\{[^}]+\}.*?\\def\\@tocrmarg\{[^}]+\}", tex, flags=re.S)),
+        "titlepage_uses_top_fill_before_logo": bool(re.search(r"\\begin\{titlepage\}.*?\\vspace\*\{\\fill\}.*?\\includegraphics", tex, flags=re.S)),
+        "cover_fields_use_centered_tabular": bool(r"\newcommand{\coverfields}" in tex and r"\begin{center}" in tex) or cover_uses_makebox,
+        "cover_fields_use_makebox_centering": cover_uses_makebox,
+        "cover_fields_have_underlines": bool(r"\underline{\makebox[\covervaluewidth][c]" in tex),
+        "cover_course_field_wrap_enabled": bool(
+            re.search(r"\\newcommand\{\\covercoursefield\}[^\n]*\\begin\{minipage\}", tex)
+        ),
+    }
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("tex", type=Path)
+    parser.add_argument("--output", type=Path)
+    parser.add_argument("--in-place", action="store_true")
+    parser.add_argument("--qa", type=Path, default=Path("latex/postprocess_qa.json"))
+    args = parser.parse_args()
+
+    tex = args.tex.read_text(encoding="utf-8")
+    body, refs = split_references(tex)
+    body = number_display_math(convert_citations(body))
+    refs = clean_reference_tail(refs)
+    processed = add_longtable_continuations(center_longtable_headers(body + refs))
+    out = args.tex if args.in_place or args.output is None else args.output
+    out.write_text(processed, encoding="utf-8")
+    if args.qa:
+        args.qa.parent.mkdir(parents=True, exist_ok=True)
+        args.qa.write_text(json.dumps(qa_report(processed, body, refs), ensure_ascii=False, indent=2), encoding="utf-8")
+    print(str(out))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

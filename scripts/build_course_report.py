@@ -1,0 +1,297 @@
+#!/usr/bin/env python3
+"""Build a Markdown course report through the bundled LaTeX workflow."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+
+
+GENERATED_SUFFIXES = (
+    ".aux",
+    ".log",
+    ".out",
+    ".toc",
+    ".xdv",
+    ".fls",
+    ".fdb_latexmk",
+    ".synctex.gz",
+)
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("source", type=Path)
+    parser.add_argument("--course", required=True)
+    parser.add_argument("--student-name", required=True)
+    parser.add_argument("--student-id", required=True)
+    parser.add_argument("--logo", default="")
+    parser.add_argument("--work-dir", type=Path, default=Path("latex"))
+    parser.add_argument("--tex", type=Path, default=Path("course_report.tex"))
+    parser.add_argument("--pdf", type=Path, default=Path("course_report.pdf"))
+    parser.add_argument("--output-pdf", type=Path)
+    parser.add_argument("--keep-intermediates", action="store_true")
+    parser.add_argument("--skip-compile", action="store_true")
+    return parser.parse_args()
+
+
+def run(cmd: list[str], cwd: Path | None = None) -> None:
+    subprocess.run(cmd, cwd=cwd, check=True, stdout=subprocess.PIPE, text=True)
+
+
+def require_tool(name: str, purpose: str) -> str:
+    path = shutil.which(name)
+    if not path:
+        raise RuntimeError(f"{name} is required for {purpose}, but was not found on PATH.")
+    return path
+
+
+def read_json(path: Path) -> dict[str, object]:
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def project_path(path: Path, project_dir: Path) -> Path:
+    return path if path.is_absolute() else project_dir / path
+
+
+def is_within(path: Path, parent: Path) -> bool:
+    try:
+        path.resolve().relative_to(parent.resolve())
+    except ValueError:
+        return False
+    return True
+
+
+def relative_project_path(path: Path, project_dir: Path) -> str:
+    try:
+        return str(path.resolve().relative_to(project_dir.resolve()))
+    except ValueError:
+        return str(path.resolve())
+
+
+def validate_prepare_qa(report: dict[str, object]) -> list[str]:
+    failures: list[str] = []
+    qa = report.get("qa", {})
+    if not isinstance(qa, dict):
+        return ["prepare QA is not an object"]
+    if qa.get("missing_images"):
+        failures.append("image files are missing")
+    if qa.get("unsafe_image_paths"):
+        failures.append("image paths are absolute, remote, or outside the source Markdown directory")
+    if qa.get("captions_with_manual_numbers"):
+        failures.append("figure captions contain manual numbers")
+    if qa.get("missing_reference_entries"):
+        failures.append("citations are missing reference-list entries")
+    if qa.get("tables_without_adjacent_caption"):
+        failures.append("Markdown pipe tables are missing adjacent Pandoc captions")
+    if qa.get("invalid_table_captions"):
+        failures.append("Markdown pipe table captions use unsupported syntax")
+    if qa.get("table_captions_separated_by_blank_line"):
+        failures.append("Markdown pipe table captions are separated by blank lines")
+    if qa.get("table_captions_with_manual_numbers"):
+        failures.append("table captions contain manual numbers")
+    return failures
+
+
+def validate_postprocess_qa(qa: dict[str, object]) -> list[str]:
+    failures: list[str] = []
+    if qa.get("body_has_abstract_section") is not False:
+        failures.append("body_has_abstract_section is not false")
+    if qa.get("references_section_found") is not True:
+        failures.append("references section was not found after postprocessing")
+    if qa.get("remaining_raw_citations_before_references") not in ([], None):
+        failures.append("raw citation markers remain before references")
+    if qa.get("remaining_unnumbered_display_math") != 0:
+        failures.append("unnumbered display math remains")
+    if qa.get("dangling_url_macro") is not False:
+        failures.append("dangling URL macro remains")
+    if qa.get("reference_urls"):
+        failures.append("reference URLs remain")
+    if qa.get("longtables_missing_caption") not in (0, None):
+        failures.append("longtable captions are missing")
+    if qa.get("longtables_missing_endfoot") not in (0, None):
+        failures.append("longtable continuation footers are missing")
+    if qa.get("longtables_missing_continued_caption") not in (0, None):
+        failures.append("longtable continued captions are missing")
+    if qa.get("longtable_headers_centered") is not True:
+        failures.append("longtable headers are not centered")
+    if qa.get("table_captions_with_manual_numbers"):
+        failures.append("manual table caption numbers remain")
+    if qa.get("toc_uses_large_section_font") is not False:
+        failures.append("TOC section entries use large or bold fonts")
+    if qa.get("toc_entry_font_sizes") != ["-4"]:
+        failures.append("TOC entry font sizes are not uniformly small-four")
+    if qa.get("toc_uses_shared_numwidth") is not True:
+        failures.append("TOC entries do not use the shared number-width setting")
+    if qa.get("toc_page_width_configured") is not True:
+        failures.append("TOC page-number width/right margin are not configured")
+    if qa.get("cover_fields_use_makebox_centering") is not True:
+        failures.append("cover fields do not use fixed-width centered makebox layout")
+    if qa.get("cover_fields_have_underlines") is not True:
+        failures.append("cover fields do not use equal-width underlined value boxes")
+    return failures
+
+
+def compile_tex(tex_path: Path, expected_pdf: Path, cwd: Path) -> None:
+    expected_pdf.parent.mkdir(parents=True, exist_ok=True)
+    tectonic = shutil.which("tectonic")
+    if tectonic:
+        run([tectonic, str(tex_path)], cwd=cwd)
+    else:
+        xelatex = shutil.which("xelatex")
+        if not xelatex:
+            raise RuntimeError("No LaTeX compiler found. Install or expose tectonic, or provide xelatex on PATH.")
+        for _ in range(2):
+            run([xelatex, "-interaction=nonstopmode", "-halt-on-error", str(tex_path)], cwd=cwd)
+
+    produced_pdf = tex_path.with_suffix(".pdf")
+    if produced_pdf != expected_pdf and produced_pdf.exists():
+        shutil.copy2(produced_pdf, expected_pdf)
+    if not expected_pdf.exists():
+        raise RuntimeError(f"compile finished but PDF was not found: {expected_pdf}")
+
+
+def cleanup_intermediates(tex_path: Path, expected_pdf: Path) -> None:
+    base = tex_path.with_suffix("")
+    for suffix in GENERATED_SUFFIXES:
+        path = Path(str(base) + suffix)
+        if path == expected_pdf:
+            continue
+        if path.exists():
+            path.unlink()
+
+
+def main() -> int:
+    args = parse_args()
+    skill_dir = Path(__file__).resolve().parents[1]
+    prepare_script = skill_dir / "scripts" / "prepare_course_report.py"
+    postprocess_script = skill_dir / "scripts" / "postprocess_course_tex.py"
+    template = skill_dir / "assets" / "templates" / "ctexart-course-report.tex"
+    lua_filter = skill_dir / "scripts" / "drop_first_h1.lua"
+    default_logo = skill_dir / "assets" / "njust_logo.png"
+
+    try:
+        require_tool("pandoc", "Markdown to LaTeX conversion")
+        source = args.source.resolve()
+        if not source.exists():
+            raise RuntimeError(f"source Markdown was not found: {source}")
+        project_dir = source.parent
+        work_dir = project_path(args.work_dir, project_dir)
+        tex_path = project_path(args.tex, project_dir)
+        pdf_path = project_path(args.pdf, project_dir)
+        output_pdf = project_path(args.output_pdf, project_dir) if args.output_pdf else None
+        if not is_within(tex_path, project_dir):
+            raise RuntimeError(
+                "--tex must be inside the source Markdown directory so relative images compile; "
+                "use --output-pdf to copy the final PDF elsewhere."
+            )
+        work_dir.mkdir(parents=True, exist_ok=True)
+        logo_arg = args.logo
+        if not logo_arg:
+            project_default_logo = project_dir / "assets" / "njust_logo.png"
+            if project_default_logo.exists():
+                logo_arg = "assets/njust_logo.png"
+            elif default_logo.exists():
+                copied_logo = work_dir / "njust_logo.png"
+                shutil.copy2(default_logo, copied_logo)
+                logo_arg = relative_project_path(copied_logo, project_dir)
+
+        run(
+            [
+                sys.executable,
+                str(prepare_script),
+                str(source),
+                "--out-dir",
+                str(work_dir),
+                "--course",
+                args.course,
+                "--student-name",
+                args.student_name,
+                "--student-id",
+                args.student_id,
+                "--logo",
+                logo_arg,
+            ],
+            cwd=project_dir,
+        )
+
+        prepare_report = work_dir / "prepare_report.json"
+        prepare = read_json(prepare_report)
+        failures = validate_prepare_qa(prepare)
+        if failures:
+            print("Prepare QA failed: " + "; ".join(failures), file=sys.stderr)
+            return 1
+
+        body = work_dir / "report_body.md"
+        metadata = work_dir / "metadata.yaml"
+        run(
+            [
+                "pandoc",
+                str(body),
+                "--from",
+                "markdown+tex_math_dollars+pipe_tables+raw_tex+raw_html",
+                "--to",
+                "latex",
+                "--standalone",
+                "--template",
+                str(template),
+                f"--lua-filter={lua_filter}",
+                "--metadata-file",
+                str(metadata),
+                "--resource-path=.",
+                "--syntax-highlighting=none",
+                "--output",
+                str(tex_path),
+            ],
+            cwd=project_dir,
+        )
+
+        postprocess_qa = work_dir / "postprocess_qa.json"
+        run(
+            [
+                sys.executable,
+                str(postprocess_script),
+                str(tex_path),
+                "--in-place",
+                "--qa",
+                str(postprocess_qa),
+            ],
+            cwd=project_dir,
+        )
+
+        qa = read_json(postprocess_qa)
+        failures = validate_postprocess_qa(qa)
+        if failures:
+            print("Postprocess QA failed: " + "; ".join(failures), file=sys.stderr)
+            return 1
+
+        if not args.skip_compile:
+            compile_tex(tex_path, pdf_path, project_dir)
+            if output_pdf:
+                if not pdf_path.exists():
+                    raise RuntimeError(f"PDF was not found for copy: {pdf_path}")
+                output_pdf.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(pdf_path, output_pdf)
+            if not args.keep_intermediates:
+                cleanup_intermediates(tex_path, pdf_path)
+
+        summary = {
+            "tex": str(tex_path),
+            "pdf": str(pdf_path if not output_pdf else output_pdf),
+            "prepare_report": str(prepare_report),
+            "postprocess_qa": str(postprocess_qa),
+            "warning_count": len(prepare.get("warnings", [])),
+        }
+        print(json.dumps(summary, ensure_ascii=False))
+        return 0
+    except (OSError, subprocess.CalledProcessError, RuntimeError, json.JSONDecodeError) as exc:
+        print(f"build_course_report failed: {exc}", file=sys.stderr)
+        return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
