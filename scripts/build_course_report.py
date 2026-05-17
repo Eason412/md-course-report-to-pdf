@@ -26,10 +26,11 @@ GENERATED_SUFFIXES = (
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("source", type=Path)
-    parser.add_argument("--course", required=True)
-    parser.add_argument("--student-name", required=True)
-    parser.add_argument("--student-id", required=True)
+    parser.add_argument("--course", default="")
+    parser.add_argument("--student-name", default="")
+    parser.add_argument("--student-id", default="")
     parser.add_argument("--logo", default="")
+    parser.add_argument("--no-cover", action="store_true")
     parser.add_argument("--work-dir", type=Path, default=Path("latex"))
     parser.add_argument("--tex", type=Path, default=Path("course_report.tex"))
     parser.add_argument("--pdf", type=Path, default=Path("course_report.pdf"))
@@ -189,6 +190,18 @@ def main() -> int:
             raise RuntimeError(f"source Markdown was not found: {source}")
         if args.skip_compile and args.output_pdf:
             raise RuntimeError("--output-pdf requires compilation; omit --output-pdf when using --skip-compile.")
+        if not args.no_cover:
+            missing_fields = [
+                name
+                for name, value in (
+                    ("--course", args.course),
+                    ("--student-name", args.student_name),
+                    ("--student-id", args.student_id),
+                )
+                if not value
+            ]
+            if missing_fields:
+                raise RuntimeError(", ".join(missing_fields) + " are required unless --no-cover is used.")
         project_dir = source.parent
         work_dir = project_path(args.work_dir, project_dir)
         tex_path = project_path(args.tex, project_dir)
@@ -200,8 +213,8 @@ def main() -> int:
                 "use --output-pdf to copy the final PDF elsewhere."
             )
         work_dir.mkdir(parents=True, exist_ok=True)
-        logo_arg = args.logo
-        if not logo_arg:
+        logo_arg = "" if args.no_cover else args.logo
+        if not args.no_cover and not logo_arg:
             project_default_logo = project_dir / "assets" / "njust_logo.png"
             if project_default_logo.exists():
                 logo_arg = "assets/njust_logo.png"
@@ -210,24 +223,24 @@ def main() -> int:
                 shutil.copy2(default_logo, copied_logo)
                 logo_arg = relative_project_path(copied_logo, project_dir)
 
-        run(
-            [
-                sys.executable,
-                str(prepare_script),
-                str(source),
-                "--out-dir",
-                str(work_dir),
-                "--course",
-                args.course,
-                "--student-name",
-                args.student_name,
-                "--student-id",
-                args.student_id,
-                "--logo",
-                logo_arg,
-            ],
-            cwd=project_dir,
-        )
+        prepare_cmd = [
+            sys.executable,
+            str(prepare_script),
+            str(source),
+            "--out-dir",
+            str(work_dir),
+            "--course",
+            args.course,
+            "--student-name",
+            args.student_name,
+            "--student-id",
+            args.student_id,
+            "--logo",
+            logo_arg,
+        ]
+        if args.no_cover:
+            prepare_cmd.append("--no-cover")
+        run(prepare_cmd, cwd=project_dir)
 
         prepare_report = work_dir / "prepare_report.json"
         prepare = read_json(prepare_report)

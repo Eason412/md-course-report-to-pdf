@@ -203,6 +203,49 @@ def render_case(source: Path, work_root: Path, compiler_available: bool) -> dict
     }
 
 
+def render_no_cover_case(source: Path, work_root: Path) -> dict[str, object]:
+    case_dir = work_root / "no_cover"
+    case_dir.mkdir(parents=True)
+    copied_source = case_dir / source.name
+    shutil.copy2(source, copied_source)
+
+    latex_dir = case_dir / "latex"
+    tex = case_dir / "report.tex"
+    built = run(
+        [
+            sys.executable,
+            str(BUILD),
+            str(copied_source),
+            "--no-cover",
+            "--skip-compile",
+            "--work-dir",
+            str(latex_dir),
+            "--tex",
+            str(tex),
+        ],
+        case_dir,
+    )
+    if built.returncode != 0:
+        return fail("no-cover build failed", {"stdout": built.stdout, "stderr": built.stderr})
+
+    try:
+        build_summary = json.loads(built.stdout)
+    except json.JSONDecodeError:
+        return fail("no-cover build summary is not JSON", {"stdout": built.stdout, "stderr": built.stderr})
+
+    report = load_json(latex_dir / "prepare_report.json")
+    tex_text = tex.read_text(encoding="utf-8") if tex.exists() else ""
+    cover = report.get("cover", {})
+
+    errors: list[str] = []
+    check(tex.exists(), "no-cover TeX output must exist", errors)
+    check(isinstance(cover, dict), "no-cover QA must include cover object", errors)
+    if isinstance(cover, dict):
+        check(cover.get("enabled") is False, "cover.enabled must be false when --no-cover is used", errors)
+    check(r"\begin{titlepage}" not in tex_text, "no-cover output must not contain a titlepage", errors)
+    return {"ok": not errors, "errors": errors, "build": build_summary}
+
+
 def render_negative_case(
     name: str,
     markdown: str,
@@ -286,6 +329,7 @@ def main() -> int:
     with tempfile.TemporaryDirectory(prefix="md-course-report-smoke-") as tmp:
         work_root = Path(tmp)
         cases = {source.name: render_case(source, work_root, compiler_available) for source in sources}
+        no_cover_case = render_no_cover_case(EXAMPLES / "minimal_report.md", work_root)
         negative_cases = {
             "table_missing_caption": render_negative_case(
                 "table_missing_caption",
@@ -334,13 +378,16 @@ def main() -> int:
             ),
         }
 
-    ok = all(bool(result.get("ok")) for result in cases.values()) and all(
-        bool(result.get("ok")) for result in negative_cases.values()
+    ok = (
+        all(bool(result.get("ok")) for result in cases.values())
+        and bool(no_cover_case.get("ok"))
+        and all(bool(result.get("ok")) for result in negative_cases.values())
     )
     summary = {
         "ok": ok,
         "compiler_available": compiler_available,
         "cases": cases,
+        "no_cover_case": no_cover_case,
         "negative_cases": negative_cases,
     }
     print(json.dumps(summary, ensure_ascii=False, indent=2))

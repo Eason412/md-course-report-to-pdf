@@ -555,10 +555,11 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("source", type=Path)
     parser.add_argument("--out-dir", type=Path, default=Path("latex"))
-    parser.add_argument("--course", required=True)
-    parser.add_argument("--student-name", required=True)
-    parser.add_argument("--student-id", required=True)
+    parser.add_argument("--course", default="")
+    parser.add_argument("--student-name", default="")
+    parser.add_argument("--student-id", default="")
     parser.add_argument("--logo", default="")
+    parser.add_argument("--no-cover", action="store_true")
     args = parser.parse_args()
 
     source = args.source
@@ -577,6 +578,7 @@ def main() -> int:
             "studentname": args.student_name,
             "studentid": args.student_id,
             "logo": args.logo,
+            "cover_disabled": "yes" if args.no_cover else "",
         }
     )
 
@@ -625,6 +627,7 @@ def main() -> int:
                 "metadata": str(metadata_path),
                 "title": title,
                 "cover": {
+                    "enabled": not args.no_cover,
                     "course": args.course,
                     "studentname": args.student_name,
                     "studentid": args.student_id,

@@ -12,6 +12,7 @@ Follow this workflow to turn one Chinese Markdown course report into a polished 
 1. **Inputs**
    - Identify the source `.md`, image folder, and desired output paths. If title, abstract, or keywords live in separate files, merge or confirm them before running the preprocessor.
    - Before conversion, ask for or explicitly confirm the cover fields: course name, student name, and student ID. These fields differ across users and reports; do not silently reuse values from a previous run unless the user explicitly asks to reuse them.
+   - If the user says they do not need a cover, pass `--no-cover` and do not ask for course name, student name, student ID, or logo.
    - Do not ask for or render a completion date on the cover unless a school-provided template explicitly requires it.
    - If `assets/njust_logo.png` is present locally, the wrapper uses it as the default logo. Otherwise pass `--logo` for a real logo, or omit it to render the cover without a logo.
    - Check Markdown/HTML image links with `grep -nE '^!\[|<img'`.

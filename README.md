@@ -8,7 +8,9 @@
 
 [![Smoke Test](https://github.com/Eason412/md-course-report-to-pdf/actions/workflows/smoke.yml/badge.svg)](https://github.com/Eason412/md-course-report-to-pdf/actions/workflows/smoke.yml)
 
-📄 把 AI 生成的 Markdown 课程报告、课程论文或作业报告，连同文中的图片、表格、公式和参考文献，一键转换成排版完整的 LaTeX/PDF 文档。既可以作为 Codex skill 使用，也可以作为普通命令行工具运行，让你少折腾格式，多专注内容，再也不用为论文排版发愁。🚀
+📄✨ 把 AI 生成的 Markdown 课程报告、课程论文或作业报告，连同文中的图片 🖼️、表格 📊、公式 🧮 和参考文献 📚，一键转换成排版完整的 LaTeX/PDF 文档。既可以作为 Codex skill 使用，也可以作为普通命令行工具运行，让你少折腾格式，多专注内容，再也不用为论文排版发愁。🚀🎓
+
+<h2 align="center">✨📝 让你调格式时不再有烦恼 🚀📄</h2>
 
 ## 适用场景
 
@@ -114,6 +116,8 @@ python3 "$SKILL_DIR/scripts/build_course_report.py" input.md \
 ```
 
 如果仓库内存在 `assets/njust_logo.png`，脚本会把它作为默认 logo 使用。AI 生成的图片需要先保存到本地项目目录，并在 Markdown 中使用相对路径引用。
+
+如果你不需要封面，使用 Codex skill 时可以直接告诉 AI「不加入封面」；命令行使用时加上 `--no-cover` 即可。
 
 ## Markdown 写法 📝
 

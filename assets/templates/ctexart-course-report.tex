@@ -152,6 +152,8 @@
 
 \begin{document}
 
+$if(cover_disabled)$
+$else$
 \begin{titlepage}
   \thispagestyle{empty}
   \centering
@@ -173,6 +175,7 @@ $endif$
 \end{titlepage}
 
 \clearpage
+$endif$
 \pagenumbering{roman}
 \setcounter{page}{1}
 \pagestyle{tocplain}
