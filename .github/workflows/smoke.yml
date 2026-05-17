@@ -18,8 +18,8 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install Pandoc
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends pandoc
+      - name: Install Pandoc and fonts
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends pandoc fonts-noto-cjk
 
       - name: Cache Tectonic packages
         uses: actions/cache@v4
