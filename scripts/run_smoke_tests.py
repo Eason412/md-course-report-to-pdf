@@ -17,6 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 EXAMPLES = ROOT / "examples"
 SCRIPTS = ROOT / "scripts"
 BUILD = SCRIPTS / "build_course_report.py"
+PREPARE = SCRIPTS / "prepare_course_report.py"
 LOCAL_DEFAULT_LOGO = ROOT / "assets" / "njust_logo.png"
 
 COURSE = "示例课程"
@@ -318,8 +319,103 @@ def render_negative_case(
     }
 
 
+def render_absolute_logo_case(work_root: Path, compiler_available: bool) -> dict[str, object]:
+    case_dir = work_root / "absolute_logo_path"
+    case_dir.mkdir(parents=True)
+    source = case_dir / "absolute_logo_path.md"
+    shutil.copy2(EXAMPLES / "minimal_report.md", source)
+
+    latex_dir = case_dir / "latex"
+    tex = case_dir / "report.tex"
+    pdf_path = case_dir / "report.pdf"
+    build_cmd = [
+        sys.executable,
+        str(BUILD),
+        str(source),
+        "--work-dir",
+        str(latex_dir),
+        "--course",
+        COURSE,
+        "--student-name",
+        STUDENT_NAME,
+        "--student-id",
+        STUDENT_ID,
+        "--logo",
+        str(LOCAL_DEFAULT_LOGO.resolve()),
+        "--tex",
+        str(tex),
+        "--pdf",
+        str(pdf_path),
+    ]
+    if not compiler_available:
+        build_cmd.append("--skip-compile")
+    built = run(build_cmd, case_dir)
+    if built.returncode != 0:
+        return fail("absolute logo build failed", {"stdout": built.stdout, "stderr": built.stderr})
+
+    report = load_json(latex_dir / "prepare_report.json")
+    cover = report.get("cover", {})
+    errors: list[str] = []
+    check(isinstance(cover, dict), "absolute logo QA must include cover object", errors)
+    if isinstance(cover, dict):
+        logo_path = str(cover.get("logo_path", ""))
+        check(cover.get("logo_exists") is True, "absolute logo copy must exist", errors)
+        check(cover.get("logo_inside_project") is True, "absolute logo copy must be inside project", errors)
+        check(not Path(logo_path).is_absolute(), "absolute logo must be converted to a relative project path", errors)
+    if compiler_available:
+        check(pdf_path.exists(), "absolute logo compiled PDF must exist", errors)
+        check(pdf_path.exists() and pdf_path.stat().st_size > 0, "absolute logo compiled PDF must be nonempty", errors)
+    return {"ok": not errors, "errors": errors}
+
+
+def render_prepare_absolute_logo_warning(work_root: Path) -> dict[str, object]:
+    case_dir = work_root / "prepare_absolute_logo_warning"
+    case_dir.mkdir(parents=True)
+    source = case_dir / "prepare_absolute_logo_warning.md"
+    shutil.copy2(EXAMPLES / "minimal_report.md", source)
+
+    out_dir = case_dir / "latex"
+    prepared = run(
+        [
+            sys.executable,
+            str(PREPARE),
+            str(source),
+            "--out-dir",
+            str(out_dir),
+            "--course",
+            COURSE,
+            "--student-name",
+            STUDENT_NAME,
+            "--student-id",
+            STUDENT_ID,
+            "--logo",
+            str(LOCAL_DEFAULT_LOGO.resolve()),
+        ],
+        case_dir,
+    )
+    if prepared.returncode != 0:
+        return fail("prepare with absolute logo should warn, not crash", {"stdout": prepared.stdout, "stderr": prepared.stderr})
+
+    report = load_json(out_dir / "prepare_report.json")
+    cover = report.get("cover", {})
+    warnings = report.get("warnings", [])
+    errors: list[str] = []
+    check(isinstance(cover, dict), "prepare absolute logo QA must include cover object", errors)
+    check(isinstance(warnings, list), "prepare absolute logo warnings must be a list", errors)
+    if isinstance(cover, dict):
+        check(cover.get("logo_exists") is True, "prepare absolute logo must exist", errors)
+        check(cover.get("logo_inside_project") is False, "prepare absolute logo must be marked outside project", errors)
+    if isinstance(warnings, list):
+        check(
+            any("logo 路径不是项目内相对路径" in str(item) for item in warnings),
+            "prepare absolute logo must emit a path warning",
+            errors,
+        )
+    return {"ok": not errors, "errors": errors}
+
+
 def main() -> int:
-    required = [BUILD]
+    required = [BUILD, PREPARE]
     missing = [str(path) for path in required if not path.exists()]
     if missing:
         print(json.dumps({"ok": False, "error": "required files missing", "missing": missing}, ensure_ascii=False))
@@ -392,6 +488,16 @@ def main() -> int:
                 "logo file is missing",
                 work_root,
                 extra_args=["--logo", "assets/missing_logo.png"],
+            ),
+            "absolute_logo_path": render_absolute_logo_case(work_root, compiler_available),
+            "prepare_absolute_logo_warning": render_prepare_absolute_logo_warning(work_root),
+            "outside_work_dir": render_negative_case(
+                "outside_work_dir",
+                "# 项目外工作目录\n\n正文。\n",
+                "--work-dir must be inside",
+                work_root,
+                extra_args=["--work-dir", str(work_root / "outside_latex")],
+                expect_prepare_failure=False,
             ),
             "skip_compile_output_pdf": render_negative_case(
                 "skip_compile_output_pdf",

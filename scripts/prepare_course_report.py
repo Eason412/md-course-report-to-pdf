@@ -639,12 +639,14 @@ def main() -> int:
     if qa["table_captions_with_manual_numbers"]:
         warnings.append("表题含手写编号，可能与 LaTeX 自动编号重复。")
     logo_path, logo_exists, logo_inside_project = (
-        resolve_project_asset(args.logo, source.parent, allow_absolute=True)
+        resolve_project_asset(args.logo, source.parent)
         if args.logo
         else ("", False, False)
     )
     if args.logo and not logo_exists:
         warnings.append(f"logo 文件不存在：{args.logo}")
+    if args.logo and logo_exists and not logo_inside_project:
+        warnings.append("logo 路径不是项目内相对路径；请改用项目目录内的相对路径，或通过 build_course_report.py 传入。")
 
     args.out_dir.mkdir(parents=True, exist_ok=True)
     body_path = args.out_dir / "report_body.md"

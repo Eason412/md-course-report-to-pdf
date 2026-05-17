@@ -43,18 +43,18 @@
 4. **参考文献和正文引用没有对应**
    - 正文引用使用 `[1]`
    - 文末条目使用 `[1] 作者. 题名[J]. 期刊, 年份.`
-   - 需要有 `## 参考文献`
+   - 有正文引用时，需要有 `## 参考文献`
 
 ### 标准 Markdown 要求
 
-转换前请先参考 [examples/标准课程报告模板.md](examples/标准课程报告模板.md)，并对照下方 `## Markdown 写法 📝` 检查源文件。至少应包含：
+转换前请先参考 [examples/标准课程报告模板.md](examples/标准课程报告模板.md)，并对照下方 `## Markdown 写法 📝` 检查源文件。标准课程报告通常应包含：
 
 - 题目
 - 中文摘要和关键词
 - 英文摘要和 Keywords
 - 按章节组织的正文，不需要手写章节编号
 - 标准 Markdown 图片、表格和公式
-- 与正文引用对应的参考文献
+- 有正文引用时，提供与引用编号对应的参考文献；无引用短作业可以省略参考文献区
 
 ## 适用场景
 
@@ -159,7 +159,7 @@ python3 "$SKILL_DIR/scripts/build_course_report.py" input.md \
   --output-pdf "course_report.pdf"
 ```
 
-如果仓库内存在 `assets/njust_logo.png`，脚本会把它作为默认 logo 使用。AI 生成的图片需要先保存到本地项目目录，并在 Markdown 中使用相对路径引用。
+如果仓库内存在 `assets/njust_logo.png`，脚本会把它作为默认 logo 使用。通过 `build_course_report.py` 指定 `--logo` 时可以使用绝对路径，脚本会复制到项目内生成目录；AI 生成的正文图片需要先保存到本地项目目录，并在 Markdown 中使用相对路径引用。
 
 如果你不需要封面，使用 Codex skill 时可以直接告诉 AI「不加入封面」；命令行使用时加上 `--no-cover` 即可。
 
@@ -304,7 +304,7 @@ scripts/run_smoke_tests.py         smoke test 运行器
 
 **找不到 Pandoc 或 LaTeX 编译器**：确认 `pandoc --version` 可运行；macOS 可用 `brew install pandoc tectonic`。如果暂时没有 LaTeX 编译器，可以先用 `--skip-compile` 检查 Markdown 和 LaTeX 后处理。
 
-**图片找不到**：从报告项目根目录运行构建命令，并保持图片路径为相对路径。默认模板会搜索 `./`、`image/`、`figures/`、`assets/`。
+**图片找不到**：从报告项目根目录运行构建命令，并在 Markdown 中写真实的项目内相对路径，例如 `image/figure_01.png` 或 `figures/result.png`。LaTeX 模板配置了 `./`、`image/`、`figures/`、`assets/` 作为编译搜索路径，但 QA 不会替你猜测文件夹，Markdown 里的路径必须能直接定位到文件。
 
 **表格没有编号**：确认表格后紧跟 `: 标题`，中间没有空行。
 

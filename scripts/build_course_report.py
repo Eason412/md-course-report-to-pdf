@@ -95,6 +95,18 @@ def relative_project_path(path: Path, project_dir: Path) -> str:
         return str(path.resolve())
 
 
+def copy_logo_into_project(logo: str, work_dir: Path, project_dir: Path) -> str:
+    logo_path = Path(logo)
+    if not logo_path.is_absolute():
+        return logo
+    if not logo_path.exists():
+        raise RuntimeError(f"--logo file was not found: {logo_path}")
+    suffix = logo_path.suffix if logo_path.suffix else ".png"
+    copied_logo = work_dir / f"user_logo{suffix}"
+    shutil.copy2(logo_path, copied_logo)
+    return relative_project_path(copied_logo, project_dir)
+
+
 def validate_prepare_qa(report: dict[str, object]) -> list[str]:
     failures: list[str] = []
     qa = report.get("qa", {})
@@ -242,6 +254,11 @@ def main() -> int:
         validate_output_path(pdf_path, source, ".pdf", "--pdf")
         if output_pdf:
             validate_output_path(output_pdf, source, ".pdf", "--output-pdf")
+        if not is_within(work_dir, project_dir):
+            raise RuntimeError(
+                "--work-dir must be inside the source Markdown directory so generated metadata, "
+                "copied logos, and relative assets stay self-contained."
+            )
         if not is_within(tex_path, project_dir):
             raise RuntimeError(
                 "--tex must be inside the source Markdown directory so relative images compile; "
@@ -249,6 +266,8 @@ def main() -> int:
             )
         work_dir.mkdir(parents=True, exist_ok=True)
         logo_arg = "" if args.no_cover else args.logo
+        if logo_arg:
+            logo_arg = copy_logo_into_project(logo_arg, work_dir, project_dir)
         if not args.no_cover and not logo_arg:
             project_default_logo = project_dir / "assets" / "njust_logo.png"
             if project_default_logo.exists():
