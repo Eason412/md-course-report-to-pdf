@@ -47,7 +47,7 @@ references/njust-thesis-format.doc
 - 图的自明性、分图 `a)`/`b)`、坐标轴量纲、表内空白/破折号含义等内容规范。
 - 附录 A/B 编号、附录图表编号、匿名送审信息隐藏、计量单位规范。
 
-## 功能
+## 功能亮点 ✨
 
 - 生成包含课程名称、姓名、学号的封面。
 - 自动抽取中文摘要、英文摘要和关键词。
@@ -113,9 +113,9 @@ python3 "$SKILL_DIR/scripts/build_course_report.py" input.md \
   --output-pdf "course_report.pdf"
 ```
 
-如果仓库内存在 `assets/njust_logo.png`，脚本会把它作为默认 logo 使用。
+如果仓库内存在 `assets/njust_logo.png`，脚本会把它作为默认 logo 使用。AI 生成的图片需要先保存到本地项目目录，并在 Markdown 中使用相对路径引用。
 
-## Markdown 写法
+## Markdown 写法 📝
 
 ### 标题、摘要和关键词
 
@@ -225,7 +225,7 @@ latex/postprocess_qa.json      LaTeX 后处理 QA
 - `reference_urls`：参考文献中是否保留了不需要的 URL。
 - `cover_fields_use_makebox_centering`：封面字段是否居中。
 
-## 测试
+## 测试 ✅
 
 ```bash
 python3 scripts/run_smoke_tests.py
@@ -250,7 +250,7 @@ scripts/postprocess_course_tex.py  LaTeX 后处理和 QA
 scripts/run_smoke_tests.py         smoke test 运行器
 ```
 
-## 常见问题
+## 常见问题 🛠️
 
 **找不到 Pandoc 或 LaTeX 编译器**：确认 `pandoc --version` 可运行；macOS 可用 `brew install pandoc tectonic`。如果暂时没有 LaTeX 编译器，可以先用 `--skip-compile` 检查 Markdown 和 LaTeX 后处理。
 

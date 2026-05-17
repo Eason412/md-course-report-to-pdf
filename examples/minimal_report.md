@@ -1,27 +1,27 @@
-# 可再生合成燃料与碳中和简报
+# 课程报告自动排版示例
 
 ## 摘要
 
-可再生合成燃料可以把绿氢与捕集二氧化碳转化为液体或气体燃料，为难以直接电气化的交通与工业环节提供减排路径。本文概述其碳源、能量来源与系统边界，并讨论碳中和评价中需要避免的重复计算问题。
+Markdown 写作适合快速组织课程报告内容，但最终提交通常需要稳定的封面、摘要、目录、图表编号和参考文献格式。本文用一个最小示例检查从 Markdown 到 PDF 的基本转换流程。
 
-关键词：可再生燃料；绿氢；二氧化碳利用；碳中和
+关键词：课程报告；自动排版；Markdown；PDF
 
 ## Abstract
 
-Renewable synthetic fuels can combine green hydrogen with captured carbon dioxide to support emission reduction in sectors that are difficult to electrify directly. This report summarizes the fuel pathway and the boundary conditions needed for carbon-neutral accounting.
+Markdown is convenient for drafting course reports, while final submission often requires stable cover pages, abstracts, tables of contents, numbering, and references. This minimal sample checks the basic Markdown-to-PDF workflow.
 
-Keywords: renewable fuel; green hydrogen; carbon dioxide utilization; carbon neutrality
+Keywords: course report; automated layout; Markdown; PDF
 
-## 技术路线
+## 写作流程
 
-可再生合成燃料通常包括电解制氢、二氧化碳捕集、合成反应与终端利用四个环节。其减排效果取决于电力是否低碳、碳源是否可追溯，以及燃料燃烧后的排放是否已经纳入全生命周期边界[1]。
+报告正文可以先用 Markdown 编写，再通过构建脚本生成 LaTeX 和 PDF。这个流程适合把标题、摘要、正文和参考文献整理为统一格式[1]。
 
-## 评价边界
+## 格式检查
 
-课程报告中的碳中和判断不应只比较燃料燃烧端排放，还应覆盖原料获取、转化效率、运输储存和替代情景。对于航空、航运等场景，合成燃料的价值主要来自与既有基础设施兼容，而不是完全消除终端排放[1][2]。
+生成 PDF 后，应检查封面字段、目录层级、正文分页、公式编号和参考文献编号是否符合提交要求[1][2]。
 
 ## 参考文献
 
-[1] International Energy Agency. The role of e-fuels in decarbonising transport. 2023.
+[1] 作者甲. Markdown 文档排版实践[J]. 示例期刊, 2024, 10(2): 1-8.
 
-[2] IPCC. Climate Change 2022: Mitigation of Climate Change. Cambridge University Press, 2022.
+[2] 作者乙. 自动化文档生成方法[M]. 北京: 示例出版社, 2023.

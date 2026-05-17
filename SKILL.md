@@ -37,7 +37,7 @@ Follow this workflow to turn one Chinese Markdown course report into a polished 
 4. **Prepare tables**
    - Prefer Markdown pipe tables for course reports. Pandoc emits `booktabs` rules (`\toprule`, `\midrule`, `\bottomrule`) for these tables, giving the expected three-line-table style.
    - Keep table headers short. Prefer labels such as `路线`, `主要原料`, `优势`, `约束`, `内容`, and `意义` over long explanatory phrases.
-   - Add a table caption immediately after the table with no blank line, for example `: 绿色甲醇路线比较`, so LaTeX can number it as `表 2.1`. Do not use `表: 标题`; Pandoc treats that as ordinary text rather than a table caption.
+   - Add a table caption immediately after the table with no blank line, for example `: 方案对比`, so LaTeX can number it as `表 2.1`. Do not use `表: 标题`; Pandoc treats that as ordinary text rather than a table caption.
    - Do not type manual labels such as `表 1` in the caption. Use a pure title and let the template number the table.
    - For tables that may cross pages, verify repeated centered headers, a continued-table marker, and `\endfoot`/`\endlastfoot` bottom rules; do not trust a single short pipe-table smoke test after changing table layout.
 
@@ -102,7 +102,7 @@ Use these defaults unless the user or a school template requires otherwise.
 - **Chinese path or `\input{...}` fails**: keep `--tex`, `--work-dir`, and generated intermediates ASCII-named.
 - **Image not found**: compile from the project root, or update `\graphicspath{{./}{image/}{assets/}}`.
 - **Caption duplicates “图 1 图 1”**: remove manual figure numbers from Markdown alt text and nearby handwritten figure-title paragraphs.
-- **Table is not numbered**: add a Pandoc table caption line such as `: 绿色甲醇路线比较` immediately after the pipe table with no blank line.
+- **Table is not numbered**: add a Pandoc table caption line such as `: 方案对比` immediately after the pipe table with no blank line.
 - **Long table breaks across pages without a bottom rule or continued heading**: check `longtables_missing_endfoot == 0`, `longtables_missing_continued_caption == 0`, and `longtable_headers_centered == true` in `postprocess_qa.json`.
 - **Table caption syntax is rejected**: use `: 标题` only. Do not use `表: 标题`, `Table: 标题`, or manual labels such as `: 表 1 标题`.
 - **`No counter 'none' defined`**: check for malformed table captions or manual caption text; use a pure `: 标题` line and remove handwritten `图/表 n` prefixes.

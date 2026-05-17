@@ -18,9 +18,9 @@ SCRIPTS = ROOT / "scripts"
 BUILD = SCRIPTS / "build_course_report.py"
 LOCAL_DEFAULT_LOGO = ROOT / "assets" / "njust_logo.png"
 
-COURSE = "可再生合成燃料及碳中和"
-STUDENT_NAME = "张三"
-STUDENT_ID = "2026000000"
+COURSE = "示例课程"
+STUDENT_NAME = "示例学生"
+STUDENT_ID = "0000000000"
 
 
 def run(cmd: list[str], cwd: Path) -> subprocess.CompletedProcess[str]:
@@ -166,7 +166,7 @@ def render_case(source: Path, work_root: Path, compiler_available: bool) -> dict
         check("（续表）" in table_block, "longtable must include continued caption text", errors)
         check(r"\endfirsthead" in table_block and r"\endhead" in table_block, "longtable must keep repeated heads", errors)
         check(r"\endfoot" in table_block and r"\endlastfoot" in table_block, "longtable must define foot and lastfoot", errors)
-        check(r"\multicolumn{1}{c}{路径}" in table_block, "plain longtable header cells must be centered", errors)
+        check(r"\multicolumn{1}{c}{方案}" in table_block, "plain longtable header cells must be centered", errors)
 
     return {
         "ok": not errors,

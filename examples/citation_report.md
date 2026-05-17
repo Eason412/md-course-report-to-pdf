@@ -32,8 +32,8 @@ Keywords: citation; references; regression
 
 ## 参考文献
 
-[1] International Energy Agency. The role of e-fuels in decarbonising transport. 2023.
+[1] 作者甲. 课程报告写作规范研究[J]. 示例期刊, 2024, 8(1): 1-6.
 
-[2] IPCC. Climate Change 2022: Mitigation of Climate Change. Cambridge University Press, 2022.
+[2] 作者乙. Markdown 引用解析方法[J]. 示例学报, 2023, 15(4): 30-38.
 
-[3] International Maritime Organization. 2023 IMO Strategy on Reduction of GHG Emissions from Ships. 2023.
+[3] 作者丙. 自动化排版系统测试[M]. 上海: 示例出版社, 2022.
