@@ -8,7 +8,7 @@
 
 [![Smoke Test](https://github.com/Eason412/md-course-report-to-pdf/actions/workflows/smoke.yml/badge.svg)](https://github.com/Eason412/md-course-report-to-pdf/actions/workflows/smoke.yml)
 
-把中文 Markdown 课程报告、课程论文或作业报告转换成排版完整的 LaTeX/PDF 文档。这个仓库既可以作为 Codex skill 使用，也可以作为普通命令行工具运行。
+📄 把 AI 生成的 Markdown 课程报告、课程论文或作业报告，连同文中的图片、表格、公式和参考文献，一键转换成排版完整的 LaTeX/PDF 文档。既可以作为 Codex skill 使用，也可以作为普通命令行工具运行，让你少折腾格式，多专注内容，再也不用为论文排版发愁。🚀
 
 ## 适用场景
 
