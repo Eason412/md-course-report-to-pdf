@@ -312,7 +312,7 @@ scripts/run_smoke_tests.py         smoke test 运行器
 
 **参考文献 URL 导致行太长**：优先删除参考文献列表中不必要的原始 URL 或 DOI URL；如果学校要求保留 URL，再考虑调整模板断行。
 
-**中文字体不可用**：模板默认优先使用 macOS 的 `Songti SC` 和 `Times New Roman`，不可用时回退到 TeX 字体。若学校有固定字体要求，请安装对应字体或修改 `assets/templates/ctexart-course-report.tex`。
+**中文字体不可用**：模板默认优先使用 macOS 的 `Songti SC` 和 `Times New Roman`；英文字体不可用时回退到 `Liberation Serif` 或 `DejaVu Serif`，中文字体不可用时回退到 Fandol 字体。若学校有固定字体要求，请安装对应字体或修改 `assets/templates/ctexart-course-report.tex`。
 
 ## 开源说明
 

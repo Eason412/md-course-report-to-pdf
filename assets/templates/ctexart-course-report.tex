@@ -14,7 +14,9 @@
 \usepackage{amsmath,amssymb,graphicx,fontspec,float,caption,booktabs,longtable,array,calc}
 \usepackage{enumitem,xcolor,hyperref,fancyhdr,bookmark,xurl,etoolbox}
 
-\IfFontExistsTF{Times New Roman}{\setmainfont{Times New Roman}}{\setmainfont{TeX Gyre Termes}}
+\IfFontExistsTF{Times New Roman}{\setmainfont{Times New Roman}}{%
+  \IfFontExistsTF{Liberation Serif}{\setmainfont{Liberation Serif}}{\setmainfont{DejaVu Serif}}%
+}
 \IfFontExistsTF{Songti SC}{\setCJKmainfont{Songti SC}}{\setCJKmainfont{FandolSong-Regular}}
 \IfFontExistsTF{Songti SC}{\setCJKsansfont{Songti SC}}{\setCJKsansfont{FandolSong-Regular}}
 \IfFontExistsTF{Songti SC}{\setCJKmonofont{Songti SC}}{\setCJKmonofont{FandolSong-Regular}}
