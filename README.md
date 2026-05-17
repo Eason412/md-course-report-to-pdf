@@ -1,5 +1,9 @@
 # Markdown 课程报告转 PDF
 
+<p align="center">
+  <img src="assets/njust_logo.png" alt="南京理工大学校徽" width="96">
+</p>
+
 [![Smoke Test](https://github.com/Eason412/md-course-report-to-pdf/actions/workflows/smoke.yml/badge.svg)](https://github.com/Eason412/md-course-report-to-pdf/actions/workflows/smoke.yml)
 
 把中文 Markdown 课程报告、课程论文或作业报告转换成排版完整的 LaTeX/PDF 文档。
@@ -403,8 +407,20 @@ assets/
 
 模板默认优先使用 macOS 的 `Songti SC` 和 `Times New Roman`，不可用时回退到 TeX 字体。若学校有固定字体要求，请安装对应字体或修改 `assets/templates/ctexart-course-report.tex`。
 
+## 反馈与改进建议
+
+这个项目还在持续完善中。如果你在使用过程中遇到格式问题、构建失败、学校模板适配需求，或者有更好的排版、QA、工作流建议，欢迎通过 GitHub Issue 提出。
+
+也可以通过邮箱联系：
+
+```text
+huyi@njust.edu.cn
+```
+
+邮件标题建议写清楚来意，例如 `md-course-report-to-pdf 使用反馈`、`课程报告 PDF 格式建议` 或 `Codex skill 改进建议`。有价值、可复用的建议会尽量整理进后续版本；如果你已经有明确修改方案，也欢迎提交 PR。
+
 ## 开源说明
 
-代码、模板、示例和文档使用 MIT License 开源。用户自行提供的 logo、校徽或其他第三方素材不包含在本许可证范围内。
+代码、模板、示例和文档使用 MIT License 开源。
 
-仓库不会跟踪 `assets/njust_logo.png`。如果你需要使用学校 logo，请在本地自行放置有授权的图片，或通过 `--logo` 指定路径。
+`assets/njust_logo.png` 用于 README 展示和默认封面 logo。南京理工大学校徽及相关标识权利归属原权利人，不属于 MIT License 授权范围。用户自行提供的 logo、校徽或其他第三方素材也不包含在本许可证范围内。

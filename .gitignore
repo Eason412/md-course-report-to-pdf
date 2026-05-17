@@ -21,8 +21,5 @@ latex/
 !assets/templates/
 !assets/templates/*.tex
 
-# Local/private assets. School logos and trademarks may need separate permission.
-assets/njust_logo.png
-
 # macOS
 .DS_Store
