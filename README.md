@@ -27,9 +27,9 @@
    - 检查是否有 `Keywords: ...`
 
 2. **正文没有按报告章节组织**
-   - 建议使用 `## 1. 引言`
-   - 建议使用 `## 2. ...`
-   - 建议使用 `## 3. ...`
+   - 建议使用 `## 引言`
+   - 建议使用 `## 正文分析`
+   - 建议使用 `## 讨论`
    - 建议使用 `## 结论`
 
 3. **图片、表格、公式写法不标准**
@@ -45,12 +45,12 @@
 
 ### 标准 Markdown 要求
 
-转换前请先对照上方 `## Markdown 写法 📝` 检查源文件。至少应包含：
+转换前请先参考 [examples/标准课程报告模板.md](examples/标准课程报告模板.md)，并对照下方 `## Markdown 写法 📝` 检查源文件。至少应包含：
 
 - 题目
 - 中文摘要和关键词
 - 英文摘要和 Keywords
-- 按章节组织的正文
+- 按章节组织的正文，不需要手写章节编号
 - 标准 Markdown 图片、表格和公式
 - 与正文引用对应的参考文献
 
@@ -288,6 +288,7 @@ SKILL.md                           Codex skill 使用说明
 agents/openai.yaml                 skill 展示元数据
 assets/njust_logo.png              README 和默认封面 logo
 assets/templates/                  Pandoc/ctexart 模板
+examples/标准课程报告模板.md       可复制的标准 Markdown 模板
 examples/                          smoke test Markdown 输入
 references/format-qa.md            详细排版和 QA 规则
 references/njust-thesis-format.doc 南京理工大学学位论文格式参考文件
