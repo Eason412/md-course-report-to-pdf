@@ -52,6 +52,19 @@ def require_tool(name: str, purpose: str) -> str:
     return path
 
 
+def pandoc_no_highlight_arg(pandoc_path: str) -> str:
+    completed = subprocess.run(
+        [pandoc_path, "--help"],
+        check=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    if "--syntax-highlighting" in completed.stdout:
+        return "--syntax-highlighting=none"
+    return "--no-highlight"
+
+
 def read_json(path: Path) -> dict[str, object]:
     return json.loads(path.read_text(encoding="utf-8"))
 
@@ -195,7 +208,7 @@ def main() -> int:
     default_logo = skill_dir / "assets" / "njust_logo.png"
 
     try:
-        require_tool("pandoc", "Markdown to LaTeX conversion")
+        pandoc = require_tool("pandoc", "Markdown to LaTeX conversion")
         source = args.source.resolve()
         if not source.exists():
             raise RuntimeError(f"source Markdown was not found: {source}")
@@ -266,7 +279,7 @@ def main() -> int:
         metadata = work_dir / "metadata.yaml"
         run(
             [
-                "pandoc",
+                pandoc,
                 str(body),
                 "--from",
                 "markdown+tex_math_dollars+pipe_tables+raw_tex+raw_html",
@@ -279,7 +292,7 @@ def main() -> int:
                 "--metadata-file",
                 str(metadata),
                 "--resource-path=.",
-                "--syntax-highlighting=none",
+                pandoc_no_highlight_arg(pandoc),
                 "--output",
                 str(tex_path),
             ],
