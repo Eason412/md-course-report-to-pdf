@@ -143,6 +143,11 @@ def render_case(source: Path, work_root: Path, compiler_available: bool) -> dict
             errors,
         )
 
+    if source.name == "no_reference_report.md":
+        check(qa.get("citation_numbers") == [], "no-reference case must have no citations", errors)
+        check(qa.get("reference_numbers") == [], "no-reference case must have no reference labels", errors)
+        check(post_qa.get("references_section_found") is False, "no-reference case should not invent references", errors)
+
     if source.name == "table_report.md":
         tex_text = tex.read_text(encoding="utf-8")
         table_block = first_longtable(tex_text)
@@ -203,6 +208,8 @@ def render_negative_case(
     markdown: str,
     expected_error: str,
     work_root: Path,
+    extra_args: list[str] | None = None,
+    expect_prepare_failure: bool = True,
 ) -> dict[str, object]:
     case_dir = work_root / name
     case_dir.mkdir(parents=True)
@@ -212,31 +219,32 @@ def render_negative_case(
     latex_dir = case_dir / "latex"
     tex = case_dir / "report.tex"
     pdf_path = case_dir / "report.pdf"
-    built = run(
-        [
-            sys.executable,
-            str(BUILD),
-            str(source),
-            "--work-dir",
-            str(latex_dir),
-            "--course",
-            COURSE,
-            "--student-name",
-            STUDENT_NAME,
-            "--student-id",
-            STUDENT_ID,
-            "--tex",
-            str(tex),
-            "--pdf",
-            str(pdf_path),
-            "--skip-compile",
-        ],
-        case_dir,
-    )
+    build_cmd = [
+        sys.executable,
+        str(BUILD),
+        str(source),
+        "--work-dir",
+        str(latex_dir),
+        "--course",
+        COURSE,
+        "--student-name",
+        STUDENT_NAME,
+        "--student-id",
+        STUDENT_ID,
+        "--tex",
+        str(tex),
+        "--pdf",
+        str(pdf_path),
+        "--skip-compile",
+    ]
+    if extra_args:
+        build_cmd.extend(extra_args)
+    built = run(build_cmd, case_dir)
 
     errors: list[str] = []
     check(built.returncode != 0, "negative case should fail", errors)
-    check("Prepare QA failed" in built.stderr, "missing prepare QA failure message", errors)
+    if expect_prepare_failure:
+        check("Prepare QA failed" in built.stderr, "missing prepare QA failure message", errors)
     check(expected_error in built.stderr, f"missing expected error: {expected_error}", errors)
     check(not tex.exists(), "negative case should fail before Pandoc emits TeX", errors)
     return {
@@ -254,7 +262,12 @@ def main() -> int:
         print(json.dumps({"ok": False, "error": "required files missing", "missing": missing}, ensure_ascii=False))
         return 1
 
-    sources = [EXAMPLES / "minimal_report.md", EXAMPLES / "table_report.md", EXAMPLES / "citation_report.md"]
+    sources = [
+        EXAMPLES / "minimal_report.md",
+        EXAMPLES / "table_report.md",
+        EXAMPLES / "citation_report.md",
+        EXAMPLES / "no_reference_report.md",
+    ]
     missing_sources = [str(path) for path in sources if not path.exists()]
     if missing_sources:
         print(
@@ -297,6 +310,27 @@ def main() -> int:
                 "# 错误表题语法\n\n| A | B |\n|---|---|\n| 1 | 2 |\n表: 路线比较\n",
                 "unsupported syntax",
                 work_root,
+            ),
+            "absolute_image_path": render_negative_case(
+                "absolute_image_path",
+                "# 绝对图片路径\n\n![系统文件](/etc/hosts)\n",
+                "absolute, remote, or outside",
+                work_root,
+            ),
+            "missing_logo": render_negative_case(
+                "missing_logo",
+                "# 缺失 logo\n\n正文。\n",
+                "logo file is missing",
+                work_root,
+                extra_args=["--logo", "assets/missing_logo.png"],
+            ),
+            "skip_compile_output_pdf": render_negative_case(
+                "skip_compile_output_pdf",
+                "# 跳过编译\n\n正文。\n",
+                "--output-pdf requires compilation",
+                work_root,
+                extra_args=["--output-pdf", str(work_root / "skip_compile_output_pdf" / "out.pdf")],
+                expect_prepare_failure=False,
             ),
         }
 

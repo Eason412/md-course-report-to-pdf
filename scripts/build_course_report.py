@@ -78,10 +78,17 @@ def validate_prepare_qa(report: dict[str, object]) -> list[str]:
     qa = report.get("qa", {})
     if not isinstance(qa, dict):
         return ["prepare QA is not an object"]
+    cover = report.get("cover", {})
+    if not isinstance(cover, dict):
+        return ["cover QA is not an object"]
     if qa.get("missing_images"):
         failures.append("image files are missing")
     if qa.get("unsafe_image_paths"):
         failures.append("image paths are absolute, remote, or outside the source Markdown directory")
+    if cover.get("logo_path") and cover.get("logo_exists") is not True:
+        failures.append("logo file is missing")
+    if cover.get("logo_path") and cover.get("logo_inside_project") is not True:
+        failures.append("logo path is absolute, remote, or outside the source Markdown directory")
     if qa.get("captions_with_manual_numbers"):
         failures.append("figure captions contain manual numbers")
     if qa.get("missing_reference_entries"):
@@ -101,7 +108,8 @@ def validate_postprocess_qa(qa: dict[str, object]) -> list[str]:
     failures: list[str] = []
     if qa.get("body_has_abstract_section") is not False:
         failures.append("body_has_abstract_section is not false")
-    if qa.get("references_section_found") is not True:
+    references_required = bool(qa.get("textsupcite_count") or qa.get("reference_labels"))
+    if references_required and qa.get("references_section_found") is not True:
         failures.append("references section was not found after postprocessing")
     if qa.get("remaining_raw_citations_before_references") not in ([], None):
         failures.append("raw citation markers remain before references")
@@ -179,6 +187,8 @@ def main() -> int:
         source = args.source.resolve()
         if not source.exists():
             raise RuntimeError(f"source Markdown was not found: {source}")
+        if args.skip_compile and args.output_pdf:
+            raise RuntimeError("--output-pdf requires compilation; omit --output-pdf when using --skip-compile.")
         project_dir = source.parent
         work_dir = project_path(args.work_dir, project_dir)
         tex_path = project_path(args.tex, project_dir)
@@ -243,7 +253,7 @@ def main() -> int:
                 "--metadata-file",
                 str(metadata),
                 "--resource-path=.",
-                "--syntax-highlighting=none",
+                "--no-highlight",
                 "--output",
                 str(tex_path),
             ],

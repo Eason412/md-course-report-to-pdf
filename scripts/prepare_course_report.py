@@ -42,11 +42,12 @@ def resolve_project_asset(path: str, source_dir: Path) -> tuple[str, bool, bool]
     if not cleaned or is_url_path(cleaned):
         return cleaned, False, False
     candidate = Path(cleaned)
+    if candidate.is_absolute():
+        return cleaned, candidate.exists(), False
     resolved = candidate if candidate.is_absolute() else source_dir / candidate
     try:
         resolved_path = resolved.resolve()
-        source_dir.resolve()
-        inside_project = True if candidate.is_absolute() else resolved_path.relative_to(source_dir.resolve()) is not None
+        inside_project = resolved_path.relative_to(source_dir.resolve()) is not None
     except ValueError:
         inside_project = False
     return cleaned, resolved.exists(), inside_project

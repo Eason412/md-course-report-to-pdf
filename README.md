@@ -242,6 +242,8 @@ latex/postprocess_qa.json      LaTeX 后处理 QA
 --skip-compile
 ```
 
+`--skip-compile` 不能和 `--output-pdf` 同时使用，因为跳过编译时不会产生最终 PDF。
+
 ## QA 检查
 
 构建完成后，建议先看命令输出中的 JSON summary，再检查：
@@ -275,6 +277,8 @@ python3 scripts/run_smoke_tests.py
 ```
 
 测试会渲染仓库内置示例，校验 JSON QA 输出，并在本机存在 `tectonic` 或 `xelatex` 时编译 PDF。如果没有 LaTeX 编译器，测试仍会覆盖预处理、Pandoc 转换和后处理流程。
+
+GitHub Actions 会运行跨平台 smoke test 和 Python 语法检查，用于确认公开仓库在干净环境中至少能完成 Markdown 到 LaTeX 的主要流程。
 
 也可以做 Python 语法检查：
 
