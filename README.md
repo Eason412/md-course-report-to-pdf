@@ -8,11 +8,13 @@
 
 [![Smoke Test](https://github.com/Eason412/md-course-report-to-pdf/actions/workflows/smoke.yml/badge.svg)](https://github.com/Eason412/md-course-report-to-pdf/actions/workflows/smoke.yml)
 
-**你还在为 AI 一键生成的 Markdown 转换成 PDF 而烦恼吗？再别烦恼了！这是一款可以解决你所有格式问题的 Codex Skill！**
+<h2 align="center">📄 还在为 AI 生成的 Markdown 转 PDF 而烦恼吗？</h2>
 
-**📄✨ 把 Markdown 课程报告、课程论文或作业报告，连同图片 🖼️、表格 📊、公式 🧮 和参考文献 📚，一键转成标准 LaTeX/PDF。少折腾格式，多专注内容！🚀🎓**
+**别再为格式反复折腾了！这是一款可以解决你大部分格式问题的 Codex Skill。✨**
 
-<h2 align="center">✨📝 让你调格式时不再有烦恼 🚀📄</h2>
+**把 AI 生成的 Markdown 课程报告、课程论文或作业报告，连同图片 🖼️、表格 📊、公式 🧮 和参考文献 📚，一键转换为标准 LaTeX/PDF 文档。**
+
+<h1 align="center">🚀 少调格式，多专注内容！🎓</h1>
 
 ## 适用场景
 
