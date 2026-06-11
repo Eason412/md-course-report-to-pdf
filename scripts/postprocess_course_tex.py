@@ -154,6 +154,9 @@ def qa_report(tex: str, body: str, refs: str) -> dict[str, object]:
     toc_section_is_bold = bool(r"\bfseries" in section_font_body and section_styles_l1)
     toc_font_sizes = {size for size in (toc_sub_font_size, toc_section_font_size) if size}
     cover_uses_makebox = bool(r"\newcommand{\coverfield}" in tex and r"\makebox[\textwidth][c]" in tex)
+    # \coverthesisfields 出现一次是宏定义；标题页再调用一次说明渲染了学位论文封面。
+    thesis_cover_rendered = len(re.findall(r"\\coverthesisfields\b", tex)) >= 2
+    course_cover_rendered = len(re.findall(r"\\coverfields\b", tex)) >= 2
     return {
         "references_section_found": bool(refs),
         "body_has_abstract_section": bool(re.search(r"\\section\{(?:摘要|Abstract)\}", body)),
@@ -193,6 +196,8 @@ def qa_report(tex: str, body: str, refs: str) -> dict[str, object]:
         "cover_fields_use_centered_tabular": bool(r"\newcommand{\coverfields}" in tex and r"\begin{center}" in tex) or cover_uses_makebox,
         "cover_fields_use_makebox_centering": cover_uses_makebox,
         "cover_fields_have_underlines": bool(r"\underline{\makebox[\covervaluewidth][c]" in tex),
+        "thesis_cover_rendered": thesis_cover_rendered,
+        "course_cover_rendered": course_cover_rendered,
         "cover_course_field_wrap_enabled": bool(
             re.search(r"\\newcommand\{\\covercoursefield\}[^\n]*\\begin\{minipage\}", tex)
         ),

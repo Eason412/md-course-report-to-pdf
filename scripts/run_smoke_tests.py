@@ -271,6 +271,56 @@ def render_no_cover_case(source: Path, work_root: Path, compiler_available: bool
     return {"ok": not errors, "errors": errors, "build": build_summary}
 
 
+def render_thesis_case(source: Path, work_root: Path, compiler_available: bool) -> dict[str, object]:
+    """Build the 学位论文 template with NO cover CLI args; cover comes from front matter."""
+    case_dir = work_root / "thesis_cover"
+    case_dir.mkdir(parents=True)
+    copied_source = case_dir / source.name
+    shutil.copy2(source, copied_source)
+
+    latex_dir = case_dir / "latex"
+    tex = case_dir / "report.tex"
+    pdf_path = case_dir / "report.pdf"
+    build_cmd = [
+        sys.executable,
+        str(BUILD),
+        str(copied_source),
+        "--work-dir",
+        str(latex_dir),
+        "--tex",
+        str(tex),
+        "--pdf",
+        str(pdf_path),
+    ]
+    if not compiler_available:
+        build_cmd.append("--skip-compile")
+    else:
+        build_cmd.extend(["--output-pdf", str(pdf_path)])
+    built = run(build_cmd, case_dir)
+    if built.returncode != 0:
+        return fail("thesis build failed", {"stdout": built.stdout, "stderr": built.stderr})
+
+    report = load_json(latex_dir / "prepare_report.json")
+    post_qa = load_json(latex_dir / "postprocess_qa.json")
+    cover = report.get("cover", {})
+    qa = report.get("qa", {})
+    errors: list[str] = []
+    check(report.get("warnings") == [], "thesis prepare warnings must be empty", errors)
+    check(isinstance(cover, dict) and cover.get("thesis") is True, "thesis cover must be detected from front matter", errors)
+    check(post_qa.get("thesis_cover_rendered") is True, "thesis titlepage must be rendered", errors)
+    check(post_qa.get("course_cover_rendered") is False, "course cover must not render for thesis input", errors)
+    check(post_qa.get("cover_fields_use_makebox_centering") is True, "thesis cover macros must stay defined", errors)
+    tex_text = tex.read_text(encoding="utf-8") if tex.exists() else ""
+    check("硕士学位论文" in tex_text, "thesis degree type must appear on the cover", errors)
+    check("分类号" in tex_text and "论文提交时间" in tex_text, "thesis cover field labels must appear", errors)
+    if isinstance(qa, dict):
+        check(qa.get("citation_numbers") == [1, 2, 3], "thesis template citations must be [1, 2, 3]", errors)
+        check(qa.get("reference_numbers") == [1, 2, 3], "thesis template references must be [1, 2, 3]", errors)
+    if compiler_available:
+        check(pdf_path.exists() and pdf_path.stat().st_size > 0, "thesis compiled PDF must be nonempty", errors)
+    return {"ok": not errors, "errors": errors}
+
+
 def render_negative_case(
     name: str,
     markdown: str,
@@ -455,6 +505,7 @@ def main() -> int:
         work_root = Path(tmp)
         cases = {source.name: render_case(source, work_root, compiler_available) for source in sources}
         no_cover_case = render_no_cover_case(EXAMPLES / "minimal_report.md", work_root, compiler_available)
+        thesis_case = render_thesis_case(EXAMPLES / "学位论文模板.md", work_root, compiler_available)
         negative_cases = {
             "table_missing_caption": render_negative_case(
                 "table_missing_caption",
@@ -541,6 +592,7 @@ def main() -> int:
     ok = (
         all(bool(result.get("ok")) for result in cases.values())
         and bool(no_cover_case.get("ok"))
+        and bool(thesis_case.get("ok"))
         and all(bool(result.get("ok")) for result in negative_cases.values())
     )
     summary = {
@@ -548,6 +600,7 @@ def main() -> int:
         "compiler_available": compiler_available,
         "cases": cases,
         "no_cover_case": no_cover_case,
+        "thesis_case": thesis_case,
         "negative_cases": negative_cases,
     }
     print(json.dumps(summary, ensure_ascii=False, indent=2))

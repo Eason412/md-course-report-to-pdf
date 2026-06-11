@@ -67,6 +67,6 @@ The layout defaults trace to the official **南京理工大学博士、硕士学
 
 - **Keywords ≤ 5** instead of the thesis range 3–8 (§2.4). Tightened for short course reports; enforced before conversion.
 - **No odd/even running headers.** The thesis spec mandates 小五号 headers carrying 论文题目 / 章节名 (§1); a course report uses none, with a centered footer page number instead of the thesis outer-edge position (§6).
-- **Simplified cover.** Only course name, student name, and student ID (equal-width underlined boxes), no completion date by default. The thesis cover/书脊/中英文封二/声明 (§2.1–2.3, 附件 2.1–2.5) are out of scope for course reports.
+- **Simplified cover by default.** The default cover carries only course name, student name, and student ID (equal-width underlined boxes), no completion date. An **optional thesis cover** (附件 2.1 layout: 分类号/密级/UDC → logo → 学位类型 → 题名/(题名和副题名) → 作者 → 指导教师/学位类别/学科名称/研究方向/论文提交时间) is rendered when the Markdown front matter supplies those fields (`cover: thesis` or any 学位 field); see README「学位论文封面」. Still out of scope: 书脊, 中英文封二, 声明 (§2.1–2.3, 附件 2.2–2.5).
 - **No thesis-only requirements:** reference counts (博士 ≥ 80, 硕士 ≥ 40, 外文/近五年比例, §3.5), 匿名送审 anonymization (§7), and 图表清单/注释表 front matter (§2.6, §2.7) are not enforced.
 - Bibliography hides raw URLs/DOI by default (the GB 7713-87 examples predate routine URL/DOI fields).

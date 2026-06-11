@@ -66,6 +66,39 @@
   \par}
 }
 
+% 学位论文封面字段（官方附件 2.1）。标签宽度比课程封面更宽以容纳"论文提交时间"。
+\newcommand{\classification}{$classification$}
+\newcommand{\secrecy}{$secrecy$}
+\newcommand{\udc}{$udc$}
+\newcommand{\degreetype}{$degreetype$}
+\newcommand{\advisorname}{$advisor$}
+\newcommand{\advisortitle}{$advisortitle$}
+\newcommand{\degreecategory}{$degreecategory$}
+\newcommand{\disciplinename}{$discipline$}
+\newcommand{\disciplinelabel}{$disciplinelabel$}
+\newcommand{\researchfield}{$researchfield$}
+\newcommand{\submitdate}{$submitdate$}
+\newlength{\coverthesislabelwidth}
+\setlength{\coverthesislabelwidth}{6\ccwd}
+\newlength{\covershortvaluewidth}
+\setlength{\covershortvaluewidth}{6\ccwd}
+\newcommand{\coverunderlineshort}[1]{\underline{\makebox[\covershortvaluewidth][c]{#1}}}
+\newcommand{\coverthesisfield}[2]{%
+  \makebox[\textwidth][c]{%
+    \makebox[\coverthesislabelwidth][s]{#1}\makebox[1\ccwd][c]{：}%
+    \coverunderline{#2}%
+  }\par\vspace{0.5em}%
+}
+\newcommand{\coverthesisfields}{%
+  {\zihao{4}\songti
+  \coverthesisfield{指导教师}{\advisorname\quad\advisortitle}
+  \coverthesisfield{学位类别}{\degreecategory}
+  \coverthesisfield{\disciplinelabel}{\disciplinename}
+  \coverthesisfield{研究方向}{\researchfield}
+  \coverthesisfield{论文提交时间}{\submitdate}
+  \par}
+}
+
 \ctexset{
   section = {
     format = \zihao{-3}\songti\bfseries,
@@ -166,6 +199,43 @@
 
 $if(cover_disabled)$
 $else$
+$if(thesis_cover)$
+\begin{titlepage}
+  \thispagestyle{empty}
+  {\zihao{4}\songti
+   \noindent\makebox[\coverthesislabelwidth][s]{分类号}\makebox[1\ccwd][c]{}\coverunderlineshort{\classification}%
+   \hfill
+   \makebox[2\ccwd][s]{密级}\makebox[1\ccwd][c]{}\coverunderlineshort{\secrecy}\par
+   \vspace{0.5em}
+   \noindent\makebox[\coverthesislabelwidth][s]{UDC}\makebox[1\ccwd][c]{}\coverunderlineshort{\udc}\par}
+  \vspace{1.1cm}
+  \centering
+$if(logo)$
+  \includegraphics[width=4.2cm]{\logopath}\par
+  \vspace{1.0cm}
+$else$
+  \vspace*{1.6cm}
+$endif$
+  {\zihao{2}\songti\bfseries \degreetype \par}
+  \vspace{1.3cm}
+  {\zihao{3}\songti\bfseries \reporttitle \par}
+$if(subtitle)$
+  \vspace{0.4cm}
+  {\zihao{4}\songti \reportsubtitle \par}
+$endif$
+  \vspace{0.3cm}
+  {\zihao{-4}\songti （题名和副题名）\par}
+  \vspace{1.1cm}
+  {\zihao{3}\songti\bfseries \studentname \par}
+  \vspace{0.2cm}
+  {\zihao{-4}\songti （作者姓名）\par}
+  \vspace{1.4cm}
+  \coverthesisfields
+  \vfill
+\end{titlepage}
+
+\clearpage
+$else$
 \begin{titlepage}
   \thispagestyle{empty}
   \centering
@@ -187,6 +257,7 @@ $endif$
 \end{titlepage}
 
 \clearpage
+$endif$
 $endif$
 \pagenumbering{roman}
 \setcounter{page}{1}

@@ -22,6 +22,99 @@ INVALID_TABLE_CAPTION_RE = re.compile(r"^\s*(?:表|图|Table|Figure)\s*[：:]\s+
 LINK_DEFINITION_RE = re.compile(r"^\s*\[[^\]]+\]:")
 SLIDE_PAGE_HEADING_RE = re.compile(r"^##\s*第\s*\d+\s*页\s*[｜|:：]")
 SLIDE_FIELD_RE = re.compile(r"^(?:屏幕|讲|图|手工反应式)\s*[：:]")
+FRONT_MATTER_KV_RE = re.compile(r"^\s*([^:：#][^:：]*?)\s*[:：]\s*(.*?)\s*$")
+
+# 学位论文封面 front-matter 键 -> metadata.yaml 模板变量名。
+# 同时接受英文键和中文键，便于直接照模板填写。
+FRONT_MATTER_KEYS: dict[str, str] = {
+    "title": "title",
+    "题目": "title",
+    "题名": "title",
+    "subtitle": "subtitle",
+    "副标题": "subtitle",
+    "副题名": "subtitle",
+    "cover": "cover_style",
+    "cover_style": "cover_style",
+    "封面": "cover_style",
+    "classification": "classification",
+    "分类号": "classification",
+    "secrecy": "secrecy",
+    "密级": "secrecy",
+    "udc": "udc",
+    "UDC": "udc",
+    "degree_type": "degreetype",
+    "学位类型": "degreetype",
+    "论文级别": "degreetype",
+    "author": "studentname",
+    "作者": "studentname",
+    "作者姓名": "studentname",
+    "advisor": "advisor",
+    "导师": "advisor",
+    "指导教师": "advisor",
+    "指导教师姓名": "advisor",
+    "advisor_title": "advisortitle",
+    "职称": "advisortitle",
+    "degree_category": "degreecategory",
+    "学位类别": "degreecategory",
+    "discipline": "discipline",
+    "学科名称": "discipline",
+    "专业名称": "discipline",
+    "discipline_label": "disciplinelabel",
+    "学科标签": "disciplinelabel",
+    "research_field": "researchfield",
+    "研究方向": "researchfield",
+    "submit_date": "submitdate",
+    "论文提交时间": "submitdate",
+    "提交时间": "submitdate",
+    "course": "course",
+    "课程名称": "course",
+    "studentname": "studentname",
+    "student_name": "studentname",
+    "姓名": "studentname",
+    "studentid": "studentid",
+    "student_id": "studentid",
+    "学号": "studentid",
+}
+
+# 触发学位论文封面的 front-matter 字段（任一非空即切换到学位论文版式）。
+THESIS_TRIGGER_KEYS = ("degreetype", "advisor", "degreecategory", "discipline", "researchfield")
+
+
+def parse_front_matter(text: str) -> tuple[dict[str, str], str]:
+    """Split a leading YAML-style ``--- ... ---`` block from the Markdown body.
+
+    Only flat ``key: value`` pairs are supported; values are read as plain
+    strings so users can fill the thesis-cover template without YAML knowledge.
+    """
+    if not text.startswith("---"):
+        return {}, text
+    lines = text.splitlines()
+    if not lines or lines[0].strip() != "---":
+        return {}, text
+    for idx in range(1, len(lines)):
+        if lines[idx].strip() in {"---", "..."}:
+            data: dict[str, str] = {}
+            for raw in lines[1:idx]:
+                if not raw.strip() or raw.lstrip().startswith("#"):
+                    continue
+                match = FRONT_MATTER_KV_RE.match(raw)
+                if not match:
+                    continue
+                key = match.group(1).strip()
+                value = match.group(2).strip().strip("'\"")
+                if key:
+                    data[key] = value
+            return data, "\n".join(lines[idx + 1 :])
+    return {}, text
+
+
+def map_front_matter(raw: dict[str, str]) -> dict[str, str]:
+    mapped: dict[str, str] = {}
+    for key, value in raw.items():
+        target = FRONT_MATTER_KEYS.get(key)
+        if target and value:
+            mapped.setdefault(target, value)
+    return mapped
 
 
 def normalize_heading(text: str) -> str:
@@ -582,23 +675,47 @@ def main() -> int:
     args = parser.parse_args()
 
     source = args.source
-    lines = source.read_text(encoding="utf-8").splitlines()
+    front_matter_raw, body_text = parse_front_matter(source.read_text(encoding="utf-8"))
+    front_matter = map_front_matter(front_matter_raw)
+    lines = body_text.splitlines()
     slide_draft = detect_slide_draft(lines)
     no_abs_lines, metadata, warnings = extract_abstract(lines)
     body_lines, title, body_warnings = prepare_body(no_abs_lines)
     warnings.extend(body_warnings)
 
     if not title:
-        title = source.stem
+        title = front_matter.get("title") or source.stem
+
+    # CLI 参数优先于 front-matter；front-matter 优先于空默认值。
+    course = args.course or front_matter.get("course", "")
+    studentname = args.student_name or front_matter.get("studentname", "")
+    studentid = args.student_id or front_matter.get("studentid", "")
+    thesis_cover = (
+        front_matter.get("cover_style", "").strip().lower() == "thesis"
+        or any(front_matter.get(key) for key in THESIS_TRIGGER_KEYS)
+    )
 
     metadata.update(
         {
             "title": title,
-            "course": args.course,
-            "studentname": args.student_name,
-            "studentid": args.student_id,
+            "subtitle": front_matter.get("subtitle", ""),
+            "course": course,
+            "studentname": studentname,
+            "studentid": studentid,
             "logo": args.logo,
             "cover_disabled": "yes" if args.no_cover else "",
+            "thesis_cover": "yes" if thesis_cover and not args.no_cover else "",
+            "classification": front_matter.get("classification", ""),
+            "secrecy": front_matter.get("secrecy", ""),
+            "udc": front_matter.get("udc", ""),
+            "degreetype": front_matter.get("degreetype", ""),
+            "advisor": front_matter.get("advisor", ""),
+            "advisortitle": front_matter.get("advisortitle", ""),
+            "degreecategory": front_matter.get("degreecategory", ""),
+            "discipline": front_matter.get("discipline", ""),
+            "disciplinelabel": front_matter.get("disciplinelabel", "") or "学科名称",
+            "researchfield": front_matter.get("researchfield", ""),
+            "submitdate": front_matter.get("submitdate", ""),
         }
     )
 
@@ -664,9 +781,10 @@ def main() -> int:
                 "title": title,
                 "cover": {
                     "enabled": not args.no_cover,
-                    "course": args.course,
-                    "studentname": args.student_name,
-                    "studentid": args.student_id,
+                    "thesis": thesis_cover and not args.no_cover,
+                    "course": course,
+                    "studentname": studentname,
+                    "studentid": studentid,
                     "logo_path": args.logo,
                     "logo_exists": logo_exists,
                     "logo_inside_project": logo_inside_project,
