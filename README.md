@@ -67,11 +67,14 @@
 
 ## 格式来源
 
-模板主要参照仓库中的原始 Word 文件：
+模板参照南京理工大学学位论文官方格式规范。仓库内同时提供二进制原件和转换后的可读文本版，便于查阅与逐条比对：
 
 ```text
-references/njust-thesis-format.doc
+references/njust-thesis-format.doc   官方格式原始 Word 文件
+references/njust-thesis-format.md    转换后的可读文本版（章节对照用）
 ```
+
+`references/format-qa.md` 中的「NJUST Source Format Mapping And Deviations」一节，记录了本项目逐条照搬了官方哪些规则、又在哪些地方为适配课程报告而有意偏离。
 
 当前已实现的主要格式：
 
@@ -79,6 +82,7 @@ references/njust-thesis-format.doc
 - 正文小四号宋体，固定 20 bp 行距；英文和数字优先使用 Times New Roman。
 - 一级标题小三号加粗宋体，段前/段后 18 bp；二级标题四号加粗宋体，段前/段后 12 bp；三级标题小四号加粗宋体，段前/段后 6 bp。
 - 中文摘要、英文摘要和目录置于正文前；正文页码重新从 1 开始。
+- 目录：标题三号加粗居中；一级条目（章、致谢、参考文献、附录）四号加粗宋体，子级小四号宋体，对齐官方规范 §2.5。
 - 图题在图下，表题在表上，图题/表题使用五号宋体。
 - 图、表、公式按章节编号，例如 `图 2.1`、`表 2.1`、`（2.1）`。
 - 参考文献另页开始，标题居中。
@@ -292,8 +296,9 @@ assets/njust_logo.png              README 和默认封面 logo
 assets/templates/                  Pandoc/ctexart 模板
 examples/标准课程报告模板.md       可复制的标准 Markdown 模板
 examples/                          smoke test Markdown 输入
-references/format-qa.md            详细排版和 QA 规则
-references/njust-thesis-format.doc 南京理工大学学位论文格式参考文件
+references/format-qa.md            详细排版和 QA 规则，含官方规范对照与偏离说明
+references/njust-thesis-format.doc 南京理工大学学位论文格式参考文件（二进制原件）
+references/njust-thesis-format.md  学位论文格式规范的可读文本版
 scripts/build_course_report.py     端到端构建封装
 scripts/prepare_course_report.py   Markdown 预处理和 QA
 scripts/postprocess_course_tex.py  LaTeX 后处理和 QA
