@@ -85,12 +85,13 @@
 \newcommand{\coverunderlineshort}[1]{\underline{\makebox[\covershortvaluewidth][c]{#1}}}
 \newcommand{\coverthesisfield}[2]{%
   \makebox[\textwidth][c]{%
-    \makebox[\coverthesislabelwidth][s]{#1}\makebox[1\ccwd][c]{：}%
+    \makebox[\coverthesislabelwidth][c]{#1}\makebox[1\ccwd][c]{：}%
     \coverunderline{#2}%
   }\par\vspace{0.5em}%
 }
 \newcommand{\coverthesisfields}{%
   {\zihao{4}\songti
+  \setlength{\coverthesislabelwidth}{6\ccwd}% 在 4 号字号下重算，否则按导言区 12pt 冻结会让 6 字标签溢出
   \coverthesisfield{指导教师}{\advisorname\quad\advisortitle}
   \coverthesisfield{学位类别}{\degreecategory}
   \coverthesisfield{\disciplinelabel}{\disciplinename}
@@ -203,11 +204,12 @@ $if(thesis_cover)$
 \begin{titlepage}
   \thispagestyle{empty}
   {\zihao{4}\songti
-   \noindent\makebox[\coverthesislabelwidth][s]{分类号}\makebox[1\ccwd][c]{}\coverunderlineshort{\classification}%
+   \setlength{\coverthesislabelwidth}{6\ccwd}\setlength{\covershortvaluewidth}{6\ccwd}%
+   \noindent\makebox[\coverthesislabelwidth][c]{分类号}\makebox[1\ccwd][c]{}\coverunderlineshort{\classification}%
    \hfill
-   \makebox[2\ccwd][s]{密级}\makebox[1\ccwd][c]{}\coverunderlineshort{\secrecy}\par
+   \makebox[2\ccwd][c]{密级}\makebox[1\ccwd][c]{}\coverunderlineshort{\secrecy}\par
    \vspace{0.5em}
-   \noindent\makebox[\coverthesislabelwidth][s]{UDC}\makebox[1\ccwd][c]{}\coverunderlineshort{\udc}\par}
+   \noindent\makebox[\coverthesislabelwidth][c]{UDC}\makebox[1\ccwd][c]{}\coverunderlineshort{\udc}\par}
   \vspace{1.1cm}
   \centering
 $if(logo)$
