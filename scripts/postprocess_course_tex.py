@@ -134,19 +134,25 @@ def clean_reference_tail(refs: str) -> str:
 
 def qa_report(tex: str, body: str, refs: str) -> dict[str, object]:
     longtables = re.findall(r"\\begin\{longtable\}.*?\\end\{longtable\}", tex, flags=re.S)
-    toc_font_macro = re.search(r"\\newcommand\{\\reporttocfont\}\{.*?\\zihao\{([^}]+)\}", tex, flags=re.S)
+    # 官方规范: 一级 TOC 条目(章/致谢/参考文献/附录)用 4 号加粗, 子级用小 4 号。
+    # 一级条目样式来自 \l@section 引用的 \reporttocsectionfont, 子级来自 \reporttocfont。
     section_toc_def = re.search(
         r"\\renewcommand\*?\\l@section.*?(?=\\renewcommand\*?\\l@subsection)",
         tex,
         flags=re.S,
     )
     section_toc_text = section_toc_def.group(0) if section_toc_def else ""
-    if toc_font_macro and r"\reporttocfont\@dottedtocline" in tex:
-        toc_font_sizes = {toc_font_macro.group(1)}
-    else:
-        toc_font_sizes = set(
-            re.findall(r"\\renewcommand\*?\\l@(?:section|subsection|subsubsection|paragraph).*?\\zihao\{([^}]+)\}", tex, flags=re.S)
-        )
+    sub_font_body_match = re.search(r"\\newcommand\{\\reporttocfont\}\{([^\n]*)\}", tex)
+    sub_font_body = sub_font_body_match.group(1) if sub_font_body_match else ""
+    section_font_body_match = re.search(r"\\newcommand\{\\reporttocsectionfont\}\{([^\n]*)\}", tex)
+    section_font_body = section_font_body_match.group(1) if section_font_body_match else ""
+    sub_size_match = re.search(r"\\zihao\{([^}]+)\}", sub_font_body)
+    toc_sub_font_size = sub_size_match.group(1) if sub_size_match else None
+    section_styles_l1 = r"\reporttocsectionfont" in section_toc_text
+    section_size_match = re.search(r"\\zihao\{([^}]+)\}", section_font_body)
+    toc_section_font_size = section_size_match.group(1) if (section_size_match and section_styles_l1) else None
+    toc_section_is_bold = bool(r"\bfseries" in section_font_body and section_styles_l1)
+    toc_font_sizes = {size for size in (toc_sub_font_size, toc_section_font_size) if size}
     cover_uses_makebox = bool(r"\newcommand{\coverfield}" in tex and r"\makebox[\textwidth][c]" in tex)
     return {
         "references_section_found": bool(refs),
@@ -177,7 +183,9 @@ def qa_report(tex: str, body: str, refs: str) -> dict[str, object]:
             for table in longtables
         ),
         "table_captions_with_manual_numbers": re.findall(r"\\caption\{[表Table\s]*\d+(?:\.\d+)?[^}]*\}", tex),
-        "toc_uses_large_section_font": bool(r"\zihao{4}" in section_toc_text or r"\bfseries" in section_toc_text),
+        "toc_section_font_size": toc_section_font_size,
+        "toc_section_is_bold": toc_section_is_bold,
+        "toc_sub_font_size": toc_sub_font_size,
         "toc_entry_font_sizes": sorted(toc_font_sizes),
         "toc_uses_shared_numwidth": bool(r"\reporttocnumwidth" in tex),
         "toc_page_width_configured": bool(re.search(r"\\def\\@pnumwidth\{[^}]+\}.*?\\def\\@tocrmarg\{[^}]+\}", tex, flags=re.S)),

@@ -105,8 +105,10 @@ def render_case(source: Path, work_root: Path, compiler_available: bool) -> dict
     check(post_qa.get("remaining_raw_citations_before_references") == [], "raw citations remain", errors)
     check(post_qa.get("remaining_unnumbered_display_math") == 0, "unnumbered display math remains", errors)
     font_sizes = post_qa.get("toc_entry_font_sizes", [])
-    check(font_sizes == ["-4"], "toc_entry_font_sizes must be exactly ['-4']", errors)
-    check(post_qa.get("toc_uses_large_section_font") is False, "TOC section entries must not use large/bold font", errors)
+    check(font_sizes == ["-4", "4"], "toc_entry_font_sizes must be ['-4', '4'] (sub 小4号, level-1 4号)", errors)
+    check(post_qa.get("toc_section_font_size") == "4", "TOC level-1 entries must be four-size", errors)
+    check(post_qa.get("toc_section_is_bold") is True, "TOC level-1 entries must be bold", errors)
+    check(post_qa.get("toc_sub_font_size") == "-4", "TOC sub-level entries must be small-four", errors)
     check(post_qa.get("toc_uses_shared_numwidth") is True, "TOC entries must use shared number width", errors)
     check(post_qa.get("toc_page_width_configured") is True, "TOC page number width/right margin must be configured", errors)
     check(post_qa.get("cover_fields_use_makebox_centering") is True, "cover fields must use centered makebox layout", errors)
@@ -198,7 +200,9 @@ def render_case(source: Path, work_root: Path, compiler_available: bool) -> dict
             ),
             "remaining_unnumbered_display_math": post_qa.get("remaining_unnumbered_display_math"),
             "toc_entry_font_sizes": post_qa.get("toc_entry_font_sizes"),
-            "toc_uses_large_section_font": post_qa.get("toc_uses_large_section_font"),
+            "toc_section_font_size": post_qa.get("toc_section_font_size"),
+            "toc_section_is_bold": post_qa.get("toc_section_is_bold"),
+            "toc_sub_font_size": post_qa.get("toc_sub_font_size"),
             "toc_uses_shared_numwidth": post_qa.get("toc_uses_shared_numwidth"),
             "toc_page_width_configured": post_qa.get("toc_page_width_configured"),
             "cover_fields_use_makebox_centering": post_qa.get("cover_fields_use_makebox_centering"),

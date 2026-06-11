@@ -144,10 +144,14 @@
 \def\@tocrmarg{3.5em}
 \newcommand{\reporttocnumwidth}{4.8em}
 \newcommand{\reporttocfont}{\zihao{-4}\songti\normalfont}
+% 官方规范: 一级标题、致谢、参考文献、附录等用 4 号加粗宋体; 其余条目用小 4 号宋体。
+% 致谢/附录是 \section, 参考文献经 \addcontentsline{toc}{section}{参考文献} 进目录,
+% 因此统一由 \l@section 的字体决定一级条目样式。
+\newcommand{\reporttocsectionfont}{\zihao{4}\songti\bfseries}
 \renewcommand*\l@section[2]{%
   \ifnum \c@tocdepth >\z@
     \addpenalty\@secpenalty
-    {\reporttocfont\@dottedtocline{1}{0em}{\reporttocnumwidth}{#1}{#2}}%
+    {\reporttocsectionfont\@dottedtocline{1}{0em}{\reporttocnumwidth}{#1}{#2}}%
   \fi}
 \renewcommand*\l@subsection{\reporttocfont\@dottedtocline{2}{0em}{\reporttocnumwidth}}
 \renewcommand*\l@subsubsection{\reporttocfont\@dottedtocline{3}{0em}{\reporttocnumwidth}}
