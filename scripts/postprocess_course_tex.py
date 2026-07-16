@@ -15,16 +15,23 @@ REF_HEADING_RE = re.compile(
     r"(?:\\clearpage\s*)?\\section\*?\{(?:\\centering\\zihao\{3\}\\songti\\bfseries\s*)?参考文献\}",
     re.S,
 )
-RAW_CITATION_TEX_RE = re.compile(r"\{\[\}([^{}]+?)\{\]\}")
+RAW_CITATION_TEX_RE = re.compile(r"\{\[\}([\d,\-\s]+?)\{\]\}")
+LONGTABLE_RE = re.compile(r"\\begin\{longtable\}.*?\\end\{longtable\}", re.S)
 
 
 def split_references(tex: str) -> tuple[str, str]:
-    pos = tex.find(REF_SENTINEL)
-    if pos == -1:
-        match = REF_HEADING_RE.search(tex)
-        if not match:
+    sentinel_block = re.compile(
+        rf"^{re.escape(REF_SENTINEL)}\s*\n\s*\\phantomsection\s*\n\s*{re.escape(REF_MARKER)}",
+        re.M,
+    )
+    sentinel_matches = list(sentinel_block.finditer(tex))
+    if sentinel_matches:
+        pos = sentinel_matches[-1].start()
+    else:
+        heading_matches = list(REF_HEADING_RE.finditer(tex))
+        if not heading_matches:
             return tex, ""
-        pos = match.start()
+        pos = heading_matches[-1].start()
     return tex[:pos], tex[pos:]
 
 
@@ -94,8 +101,36 @@ def center_longtable_headers(tex: str) -> str:
             + block[data_start:]
         )
 
-    centered = re.sub(r"\\begin\{longtable\}.*?\\end\{longtable\}", repl, tex, flags=re.S)
-    return re.sub(r"\\begin\{longtable\}.*?\\end\{longtable\}", lambda match: center_plain_headers(match.group(0)), centered, flags=re.S)
+    centered = LONGTABLE_RE.sub(repl, tex)
+    return LONGTABLE_RE.sub(lambda match: center_plain_headers(match.group(0)), centered)
+
+
+def center_longtable_cells(tex: str) -> str:
+    def center_simple_column_spec(match: re.Match[str]) -> str:
+        return match.group(1) + re.sub(r"[lcr]", "c", match.group(2)) + match.group(3)
+
+    def repl(match: re.Match[str]) -> str:
+        block = match.group(0)
+        block = re.sub(
+            r">\{\\(?:raggedright|raggedleft|centering)\\arraybackslash\}p\{",
+            lambda _: r">{\centering\arraybackslash}m{",
+            block,
+        )
+        block = re.sub(
+            r"(\\begin\{longtable\}\[\]\{@\{\})([lcr]+)(@\{\}\})",
+            center_simple_column_spec,
+            block,
+            count=1,
+        )
+        block = re.sub(
+            r"\\begin\{minipage\}\[[btc]\]\{\\linewidth\}\\(?:raggedright|raggedleft|centering)",
+            lambda _: r"\begin{minipage}[c]{\linewidth}\centering",
+            block,
+        )
+        block = re.sub(r"\\multicolumn\{1\}\{[lcr]\}\{", r"\\multicolumn{1}{c}{", block)
+        return block
+
+    return LONGTABLE_RE.sub(repl, tex)
 
 
 def add_longtable_continuations(tex: str) -> str:
@@ -111,6 +146,12 @@ def add_longtable_continuations(tex: str) -> str:
                 "\\endhead\n\\bottomrule\\noalign{}\n\\endfoot",
                 1,
             )
+        if r"\endlastfoot" not in block:
+            block = block.replace(
+                r"\endfoot",
+                "\\endfoot\n\\bottomrule\\noalign{}\n\\endlastfoot",
+                1,
+            )
         if "（续表）" not in block:
             block = block.replace(
                 r"\endfirsthead",
@@ -119,7 +160,60 @@ def add_longtable_continuations(tex: str) -> str:
             )
         return block
 
-    return re.sub(r"\\begin\{longtable\}.*?\\end\{longtable\}", repl, tex, flags=re.S)
+    return LONGTABLE_RE.sub(repl, tex)
+
+
+def _read_braced(text: str, opening: int) -> tuple[str, int] | None:
+    if opening >= len(text) or text[opening] != "{":
+        return None
+    depth = 1
+    escaped = False
+    position = opening + 1
+    while position < len(text):
+        char = text[position]
+        if escaped:
+            escaped = False
+        elif char == "\\":
+            escaped = True
+        elif char == "{":
+            depth += 1
+        elif char == "}":
+            depth -= 1
+            if depth == 0:
+                return text[opening + 1 : position], position + 1
+        position += 1
+    return None
+
+
+def _strip_reference_link_commands(refs: str) -> str:
+    output: list[str] = []
+    position = 0
+    while position < len(refs):
+        if refs.startswith(r"\href{", position):
+            target = _read_braced(refs, position + len(r"\href"))
+            if target and target[0].startswith(("http://", "https://")):
+                label = _read_braced(refs, target[1])
+                if label:
+                    output.append(label[0])
+                    position = label[1]
+                    continue
+        if refs.startswith(r"\url{", position):
+            target = _read_braced(refs, position + len(r"\url"))
+            if target and target[0].startswith(("http://", "https://")):
+                position = target[1]
+                continue
+        output.append(refs[position])
+        position += 1
+    return "".join(output)
+
+
+def _remove_bare_url(match: re.Match[str]) -> str:
+    url = match.group(0)
+    trailing = ""
+    while url and url[-1] in ".,;:!?，。；：、)］]":
+        trailing = url[-1] + trailing
+        url = url[:-1]
+    return trailing
 
 
 def clean_reference_tail(refs: str) -> str:
@@ -127,8 +221,9 @@ def clean_reference_tail(refs: str) -> str:
         return refs
     refs = refs.replace(REF_SENTINEL + "\n", "")
     refs = refs.replace(REF_MARKER + "\n\\addcontentsline", REF_MARKER + "\n\\phantomsection\n\\addcontentsline")
-    refs = re.sub(r"\\url\{https?://[^}]+\}", "", refs)
-    refs = re.sub(r"\s*https?://[^\s}]+", "", refs)
+    refs = _strip_reference_link_commands(refs)
+    refs = re.sub(r"https?://[^\s{}\\]+", _remove_bare_url, refs)
+    refs = re.sub(r"[ \t]+([,.;:!?，。；：、])", r"\1", refs)
     return refs
 
 
@@ -177,11 +272,27 @@ def qa_report(tex: str, body: str, refs: str) -> dict[str, object]:
         ),
         "longtables_missing_caption": sum(1 for table in longtables if r"\caption{" not in table),
         "longtables_missing_endfoot": sum(1 for table in longtables if r"\endfoot" not in table),
+        "longtables_missing_endlastfoot": sum(1 for table in longtables if r"\endlastfoot" not in table),
         "longtables_missing_continued_caption": sum(1 for table in longtables if "（续表）" not in table),
         "longtable_headers_centered": all(
             (
                 r"\begin{minipage}[b]{\linewidth}\centering" in table
+                or r"\begin{minipage}[c]{\linewidth}\centering" in table
                 or r"\multicolumn{1}{c}{" in table
+            )
+            for table in longtables
+        ),
+        "longtable_cells_centered": all(
+            not re.search(
+                r"\\raggedright|\\raggedleft|\\begin\{longtable\}\[\]\{@\{\}[lr]|\\multicolumn\{1\}\{[lr]\}\{",
+                table,
+            )
+            for table in longtables
+        ),
+        "longtable_columns_vertical_centered": all(
+            not re.search(
+                r">\{\\(?:raggedright|raggedleft|centering)\\arraybackslash\}p\{|\\begin\{minipage\}\[[bt]\]\{\\linewidth\}",
+                table,
             )
             for table in longtables
         ),
@@ -214,9 +325,8 @@ def main() -> int:
 
     tex = args.tex.read_text(encoding="utf-8")
     body, refs = split_references(tex)
-    body = number_display_math(convert_citations(body))
     refs = clean_reference_tail(refs)
-    processed = add_longtable_continuations(center_longtable_headers(body + refs))
+    processed = add_longtable_continuations(center_longtable_cells(center_longtable_headers(body + refs)))
     out = args.tex if args.in_place or args.output is None else args.output
     out.write_text(processed, encoding="utf-8")
     if args.qa:

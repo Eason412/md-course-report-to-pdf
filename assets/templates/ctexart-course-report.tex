@@ -134,7 +134,7 @@
 \DeclareCaptionFont{wuhao}{\zihao{5}\songti}
 \captionsetup[figure]{font=wuhao,labelfont=bf,labelsep=space,name=图,position=bottom}
 \captionsetup[table]{font=wuhao,labelfont=bf,labelsep=space,name=表,position=top}
-\captionsetup[longtable]{font=wuhao,labelfont=bf,labelsep=space,name=表,position=top}
+\captionsetup[longtable]{font=wuhao,labelfont=bf,labelsep=space,name=表,position=top,skip=0pt}
 \setlength{\LTcapwidth}{\textwidth}
 \numberwithin{figure}{section}
 \numberwithin{table}{section}
@@ -168,8 +168,15 @@
 \AtBeginEnvironment{longtable}{\zihao{5}\songti}
 \makeatletter
 \define@key{Gin}{alt}{}
-\def\fps@figure{H}
+\def\fps@figure{!htbp}
 \def\fps@table{H}
+\setcounter{topnumber}{3}
+\setcounter{bottomnumber}{2}
+\setcounter{totalnumber}{5}
+\renewcommand{\topfraction}{0.85}
+\renewcommand{\bottomfraction}{0.7}
+\renewcommand{\textfraction}{0.15}
+\renewcommand{\floatpagefraction}{0.66}
 \renewcommand{\tagform@}[1]{\maketag@@@{（#1）}}
 \def\maxwidth{\ifdim\Gin@nat@width>\linewidth\linewidth\else\Gin@nat@width\fi}
 \def\maxheight{\ifdim\Gin@nat@height>0.78\textheight 0.78\textheight\else\Gin@nat@height\fi}

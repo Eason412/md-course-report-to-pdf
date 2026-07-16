@@ -28,7 +28,7 @@ Load this file only when changing the template, rewriting references, debugging 
 - Body uses small-four Songti, fixed 20 bp line spacing, 2-em first-line indentation, and no extra paragraph spacing.
 - Figure/table captions use fifth-size Songti; figure captions below figures, table captions above tables when Pandoc emits them that way.
 - Tables should come from Markdown pipe tables with a pure caption line such as `: 路线比较` immediately after the table with no blank line; do not type `表 1`, `表: 标题`, or `Table: 标题`.
-- Table headers should be concise and centered in the rendered longtable. If a table crosses pages, continuation pages should show a non-numbered `（续表）` caption and both non-final and final pages should carry booktabs bottom rules.
+- Table headers and body cells should be concise, horizontally centered, and vertically centered in the rendered longtable. If a table crosses pages, continuation pages should show a non-numbered `（续表）` caption and both non-final and final pages should carry booktabs bottom rules.
 - Figures, tables, and equations are numbered by section: `图 2.1`, `表 2.1`, `（2.1）`.
 
 ## QA Checklist
@@ -37,7 +37,7 @@ Load this file only when changing the template, rewriting references, debugging 
 - `latex/postprocess_qa.json`: `references_section_found` is true when references exist; `body_has_abstract_section` is false; `remaining_raw_citations_before_references` is empty; `remaining_unnumbered_display_math` is normally zero; `reference_urls` and `dangling_url_macro` are empty unless URLs are intentional.
 - Cover visual check: logo centered horizontally near upper one-third; field block centered with equal-width underlined value boxes; no completion date.
 - TOC visual check: `toc_section_font_size == "4"`, `toc_section_is_bold == true`, `toc_sub_font_size == "-4"`, `toc_entry_font_sizes == ["-4", "4"]`; level-1 entries (chapters, 致谢, 参考文献, 附录) render in four-size bold, sub-levels in small-four, with consistent dot-leader/page-number alignment.
-- Table check: `latex/prepare_report.json` has no `tables_without_adjacent_caption`, `table_captions_separated_by_blank_line`, `invalid_table_captions`, or `table_captions_with_manual_numbers`; `longtable_count` matches expected table count, `booktabs_longtable_count` matches `longtable_count`, `longtables_missing_caption`, `longtables_missing_endfoot`, and `longtables_missing_continued_caption` are zero, `longtable_headers_centered` is true, and captions render above tables.
+- Table check: `latex/prepare_report.json` has no `tables_without_adjacent_caption`, `table_captions_separated_by_blank_line`, `invalid_table_captions`, or `table_captions_with_manual_numbers`; `longtable_count` matches expected table count, `booktabs_longtable_count` matches `longtable_count`, `longtables_missing_caption`, `longtables_missing_endfoot`, `longtables_missing_endlastfoot`, and `longtables_missing_continued_caption` are zero, `longtable_headers_centered`, `longtable_cells_centered`, and `longtable_columns_vertical_centered` are true, and captions render above tables.
 - Log check: no `LaTeX Error`, missing image, font failure, or large unresolved `Overfull \hbox`. Mild `Underfull \vbox` is acceptable when the PDF renders correctly.
 
 ## Troubleshooting

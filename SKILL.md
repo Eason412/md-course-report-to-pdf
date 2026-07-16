@@ -13,7 +13,7 @@ Follow this workflow to turn one Chinese Markdown course report into a polished 
    - Identify the source `.md`, image folder, and desired output paths. If title, abstract, or keywords live in separate files, merge or confirm them before running the preprocessor.
    - Before conversion, ask for or explicitly confirm the cover fields: course name, student name, and student ID. These fields differ across users and reports; do not silently reuse values from a previous run unless the user explicitly asks to reuse them.
    - If the user says they do not need a cover, pass `--no-cover` and do not ask for course name, student name, student ID, or logo.
-   - **Thesis cover (optional):** if the user wants a 学位论文-style cover instead of the course cover, put the fields in a YAML front matter block at the very top of the source `.md` (`cover: thesis`, plus any of `degree_type`/`classification`/`secrecy`/`udc`/`author`/`advisor`/`advisor_title`/`degree_category`/`discipline`/`research_field`/`submit_date`; see `examples/学位论文模板.md` and README「学位论文封面」). When thesis front matter is present the wrapper renders the 附件 2.1 layout and does not require `--course/--student-name/--student-id`. Empty fields show as blank underlines. Leave 书脊/封二/声明 out of scope.
+   - **Thesis cover (optional):** if the user wants a 学位论文-style cover instead of the course cover, put `cover: thesis` in a YAML front matter block at the very top of the source `.md`, then add any needed fields from `degree_type`/`classification`/`secrecy`/`udc`/`author`/`advisor`/`advisor_title`/`degree_category`/`discipline`/`research_field`/`submit_date`; see `examples/学位论文模板.md` and README「学位论文封面」. Without `cover: thesis`, only `degree_type`, `advisor`, `degree_category`, `discipline`, or `research_field` automatically triggers the thesis layout; the other fields are supplementary. Once triggered, the wrapper renders the 附件 2.1 layout and does not require `--course/--student-name/--student-id`. Empty fields show as blank underlines. Leave 书脊/封二/声明 out of scope.
    - Do not ask for or render a completion date on the cover unless a school-provided template explicitly requires it.
    - If `assets/njust_logo.png` is present locally, the wrapper uses it as the default logo. Otherwise pass `--logo` for a real logo, or omit it to render the cover without a logo.
    - Check Markdown/HTML image links with `grep -nE '^!\[|<img'`.
@@ -58,13 +58,14 @@ Follow this workflow to turn one Chinese Markdown course report into a polished 
      Omit `--logo` to use the local bundled logo when present. Pass an explicit path only when the report should use a specific real logo.
    - Read the wrapper's JSON summary, then inspect `latex/prepare_report.json` and `latex/postprocess_qa.json` before trusting the PDF. The wrapper blocks missing or unsafe body image paths, missing references, manual figure/table numbers, unsupported table-caption syntax, table-caption failures, inconsistent TOC font/width settings, and non-centered or non-underlined cover field layout before compile; fix the Markdown source or template before retrying.
    - The preprocessor removes repeated numeric citation markers after their first normal body-prose appearance and normalizes Chinese citation punctuation to ASCII markers. Review `qa.citation_dedup` in `latex/prepare_report.json` when citation placement matters.
+   - The wrapper serializes builds from the same source directory, applies a bounded timeout to every external command, compiles in an isolated temporary directory, and atomically replaces successful PDF outputs. Use `--command-timeout SECONDS` only when a large report legitimately needs more than the default 180 seconds per command.
 
 6. **Manual fallback**
    - If debugging the pipeline or localizing a failure, run the bundled scripts in this order: `prepare_course_report.py`, Pandoc with `ctexart-course-report.tex` and `drop_first_h1.lua`, then `postprocess_course_tex.py`.
    - Resolve script/template paths from the skill directory; do not assume `scripts/...` exists in the report project.
    - Do not use `--citeproc` for this course-report path unless the template is extended with Pandoc CSL macros. Use concise numeric references in the Markdown source instead.
-   - The postprocessor converts only in-text numeric citations from Pandoc's `{[}n{]}` form to `\textsupcite{n}` before the reference list; bibliography labels remain normal `[n]`.
-   - The postprocessor converts untagged display math `\[...\]` into numbered `equation` environments. Use explicit `align`/`equation` in Markdown only when special alignment or labels are needed.
+   - The Pandoc Lua filter converts only semantic prose citations to `\textsupcite{n}` before the reference list. It deliberately leaves code, raw LaTeX, links, image labels, tables, and bibliography labels untouched.
+   - The Lua filter converts semantic untagged display math into numbered `equation` environments. Use explicit `align`/`equation` in Markdown when special alignment, tags, or labels are needed; raw LaTeX blocks are preserved.
 
 7. **Use the ctexart template**
    - Start from `$SKILL_DIR/assets/templates/ctexart-course-report.tex`.
@@ -78,7 +79,7 @@ Follow this workflow to turn one Chinese Markdown course report into a polished 
      ```
    - Verify PDF exists, page count is nonzero, A4 portrait size is expected, and image count matches inserted figures.
    - Inspect the cover, TOC, abstract, first body page, at least one chapter transition page, and the reference page when layout changed.
-   - Check `latex/prepare_report.json` and `latex/postprocess_qa.json` for missing images, duplicated abstract/body headings, raw citation markers, unnumbered display math, unwanted bibliography URLs, table-caption failures, missing longtable continuation footers, missing continued captions, and non-centered table headers.
+   - Check `latex/prepare_report.json` and `latex/postprocess_qa.json` for missing images, invalid or unmatched citations, duplicated abstract/body headings, raw citation markers, unnumbered display math, unwanted bibliography URLs, table-caption failures, missing longtable continuation/final-page footers, missing continued captions, non-centered table text, and non-vertically-centered table columns.
    - For layout, table, citation, or reference-rule changes, use the detailed checklist in `references/format-qa.md`.
    - When compiler logs are available, check for `LaTeX Error`, `File not found`, large `Overfull \hbox`, missing images, and font failures.
    - Mild `Underfull \vbox` and macOS font reproducibility warnings are usually acceptable if the PDF renders correctly.
@@ -95,7 +96,7 @@ Use these defaults unless the user or a school template requires otherwise. They
 - Headers: no page headers by default; footer page number centered.
 - Body: Chinese text uses Songti, English letters/numbers use Times New Roman or fallback; body is small-four with fixed 20 bp line spacing.
 - Figures, tables, and equations: number within the current section, for example `图 2.1`, `表 2.1`, and `（2.1）`.
-- Long tables: repeated table heads are centered; continuation pages include a non-numbered `（续表）` caption; non-final pages and final pages both carry booktabs bottom rules.
+- Long tables: repeated table heads and body cells are horizontally centered; paragraph columns are vertically centered; continuation pages include a non-numbered `（续表）` caption; non-final and final pages both carry booktabs bottom rules.
 - Keywords: at most five.
 - Level-1 body headings start on new pages.
 - References: start on a new page, center the “参考文献” heading, keep bibliography labels normal, and hide unwanted raw URLs/DOI URLs.
@@ -106,7 +107,7 @@ Use these defaults unless the user or a school template requires otherwise. They
 - **Image not found**: compile from the project root, or update `\graphicspath{{./}{image/}{figures/}{assets/}}`.
 - **Caption duplicates “图 1 图 1”**: remove manual figure numbers from Markdown alt text and nearby handwritten figure-title paragraphs.
 - **Table is not numbered**: add a Pandoc table caption line such as `: 方案对比` immediately after the pipe table with no blank line.
-- **Long table breaks across pages without a bottom rule or continued heading**: check `longtables_missing_endfoot == 0`, `longtables_missing_continued_caption == 0`, and `longtable_headers_centered == true` in `postprocess_qa.json`.
+- **Long table breaks across pages without a bottom rule, continued heading, or centered cells**: check `longtables_missing_endfoot == 0`, `longtables_missing_endlastfoot == 0`, `longtables_missing_continued_caption == 0`, `longtable_headers_centered == true`, `longtable_cells_centered == true`, and `longtable_columns_vertical_centered == true` in `postprocess_qa.json`.
 - **Table caption syntax is rejected**: use `: 标题` only. Do not use `表: 标题`, `Table: 标题`, or manual labels such as `: 表 1 标题`.
 - **`No counter 'none' defined`**: check for malformed table captions or manual caption text; use a pure `: 标题` line and remove handwritten `图/表 n` prefixes.
 - **`Missing number, treated as zero` near tables**: ensure the template loads `calc`, then check that each Pandoc table caption is immediately adjacent to the pipe table.
