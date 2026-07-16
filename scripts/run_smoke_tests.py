@@ -113,14 +113,14 @@ def inspect_pdf(pdf_path: Path) -> dict[str, object]:
     if pdftotext:
         inspected = run([pdftotext, str(pdf_path), "-"], pdf_path.parent)
         if inspected.returncode == 0:
-            result["continued_table_text"] = "续表" in inspected.stdout
+            result["continued_table_text"] = inspected.stdout.count("LONGTABLEQA") > 1
             table_pages = [
                 page
                 for page in inspected.stdout.split("\f")
-                if re.search(r"方案\s+\d{2}", page)
+                if re.search(r"ROW\s+\d{2}", page)
             ]
             if len(table_pages) > 1:
-                result["continued_table_pages_valid"] = all("续表" in page for page in table_pages[1:])
+                result["continued_table_pages_valid"] = all("LONGTABLEQA" in page for page in table_pages[1:])
     qpdf = shutil.which("qpdf")
     if qpdf:
         inspected = run([qpdf, "--check", str(pdf_path)], pdf_path.parent)
@@ -136,10 +136,13 @@ def render_case(source: Path, work_root: Path, compiler_available: bool) -> dict
     if source.name == "table_report.md":
         text = copied_source.read_text(encoding="utf-8")
         extra_rows = "\n".join(
-            f"| 方案 {number:02d} | 跨页长表回归数据 | 第 {number:02d} 行约束说明 |"
+            f"| ROW {number:02d} | 跨页长表回归数据 | 第 {number:02d} 行约束说明 |"
             for number in range(4, 75)
         )
-        text = text.replace("| 方案 C | 扩展性强 | 配置较复杂 |\n: 方案对比", f"| 方案 C | 扩展性强 | 配置较复杂 |\n{extra_rows}\n: 方案对比")
+        text = text.replace(
+            "| 方案 C | 扩展性强 | 配置较复杂 |\n: 方案对比",
+            f"| 方案 C | 扩展性强 | 配置较复杂 |\n{extra_rows}\n: LONGTABLEQA",
+        )
         copied_source.write_text(text, encoding="utf-8")
 
     latex_dir = case_dir / "latex"
