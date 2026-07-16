@@ -4,11 +4,20 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 import shutil
 import subprocess
 import sys
+import tempfile
+import time
+from typing import TextIO
+
+try:
+    import fcntl
+except ImportError:  # Windows
+    fcntl = None  # type: ignore[assignment]
 from pathlib import Path
 
 
@@ -22,6 +31,18 @@ GENERATED_SUFFIXES = (
     ".fdb_latexmk",
     ".synctex.gz",
 )
+INTERMEDIATE_NAMES = ("report_body.md", "metadata.yaml", "prepare_report.json", "postprocess_qa.json")
+DEFAULT_COMMAND_TIMEOUT = 180.0
+
+
+def command_output(stdout: str | bytes | None, stderr: str | bytes | None) -> str:
+    streams: list[str] = []
+    for label, value in (("stdout", stdout), ("stderr", stderr)):
+        if isinstance(value, bytes):
+            value = value.decode("utf-8", errors="replace")
+        if value and value.strip():
+            streams.append(f"[{label}]\n{value.strip()}")
+    return "\n".join(streams)
 
 
 def parse_args() -> argparse.Namespace:
@@ -39,11 +60,33 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output-pdf", type=Path)
     parser.add_argument("--keep-intermediates", action="store_true")
     parser.add_argument("--skip-compile", action="store_true")
+    parser.add_argument("--command-timeout", type=float, default=DEFAULT_COMMAND_TIMEOUT)
     return parser.parse_args()
 
 
-def run(cmd: list[str], cwd: Path | None = None) -> None:
-    subprocess.run(cmd, cwd=cwd, check=True, stdout=subprocess.PIPE, text=True)
+def run(
+    cmd: list[str],
+    cwd: Path | None = None,
+    timeout: float = DEFAULT_COMMAND_TIMEOUT,
+) -> subprocess.CompletedProcess[str]:
+    try:
+        completed = subprocess.run(
+            cmd,
+            cwd=cwd,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+    except subprocess.TimeoutExpired as exc:
+        details = command_output(exc.stdout, exc.stderr)
+        suffix = f"\n{details}" if details else ""
+        raise RuntimeError(f"command timed out after {timeout:g}s: {cmd[0]}{suffix}") from exc
+    if completed.returncode != 0:
+        details = command_output(completed.stdout, completed.stderr)
+        suffix = f"\n{details}" if details else ""
+        raise RuntimeError(f"command failed with exit code {completed.returncode}: {cmd[0]}{suffix}")
+    return completed
 
 
 def require_tool(name: str, purpose: str) -> str:
@@ -53,14 +96,8 @@ def require_tool(name: str, purpose: str) -> str:
     return path
 
 
-def pandoc_no_highlight_arg(pandoc_path: str) -> str:
-    completed = subprocess.run(
-        [pandoc_path, "--help"],
-        check=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
-    )
+def pandoc_no_highlight_arg(pandoc_path: str, timeout: float = DEFAULT_COMMAND_TIMEOUT) -> str:
+    completed = run([pandoc_path, "--help"], timeout=timeout)
     if "--syntax-highlighting" in completed.stdout:
         return "--syntax-highlighting=none"
     return "--no-highlight"
@@ -143,8 +180,92 @@ def is_within(path: Path, parent: Path) -> bool:
 def validate_output_path(path: Path, source: Path, expected_suffix: str, option: str) -> None:
     if path.suffix.lower() != expected_suffix:
         raise RuntimeError(f"{option} must end with {expected_suffix}: {path}")
-    if path.resolve() == source.resolve():
+    if path.exists() and path.is_dir():
+        raise RuntimeError(f"{option} must be a file path, not a directory: {path}")
+    if paths_are_same(path, source):
         raise RuntimeError(f"{option} must not overwrite the source Markdown: {path}")
+
+
+def paths_are_same(first: Path, second: Path) -> bool:
+    if first.resolve() == second.resolve():
+        return True
+    if first.exists() and second.exists():
+        try:
+            return first.samefile(second)
+        except OSError:
+            return False
+    return False
+
+
+def validate_generated_path_collisions(
+    source: Path,
+    work_dir: Path,
+    tex_path: Path,
+    pdf_path: Path,
+    output_pdf: Path | None,
+) -> None:
+    generated = [work_dir / name for name in INTERMEDIATE_NAMES]
+    for path in generated:
+        if paths_are_same(source, path):
+            raise RuntimeError(f"source Markdown conflicts with a generated intermediate: {path}")
+    if paths_are_same(tex_path, pdf_path):
+        raise RuntimeError("--tex and --pdf must not refer to the same file")
+    if output_pdf is not None and paths_are_same(tex_path, output_pdf):
+        raise RuntimeError("--tex and --output-pdf must not refer to the same file")
+
+
+def acquire_project_lock(project_dir: Path, timeout: float) -> TextIO:
+    digest = hashlib.sha256(str(project_dir.resolve()).encode("utf-8")).hexdigest()[:20]
+    lock_path = Path(tempfile.gettempdir()) / f"md-course-report-{digest}.lock"
+    handle = lock_path.open("a+", encoding="utf-8")
+    deadline = time.monotonic() + timeout
+    while True:
+        try:
+            if fcntl is not None:
+                fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            else:
+                import msvcrt
+
+                handle.seek(0, 2)
+                if handle.tell() == 0:
+                    handle.write("\0")
+                    handle.flush()
+                handle.seek(0)
+                msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+            return handle
+        except OSError:
+            if time.monotonic() >= deadline:
+                handle.close()
+                raise RuntimeError(f"another build still holds the project lock after {timeout:g}s: {project_dir}")
+            time.sleep(0.05)
+
+
+def atomic_copy(source: Path, destination: Path) -> None:
+    if destination.exists() and destination.is_dir():
+        raise RuntimeError(f"output PDF must be a file path, not a directory: {destination}")
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    handle = tempfile.NamedTemporaryFile(
+        prefix=f".{destination.name}.",
+        suffix=".tmp",
+        dir=destination.parent,
+        delete=False,
+    )
+    temporary = Path(handle.name)
+    handle.close()
+    try:
+        shutil.copy2(source, temporary)
+        temporary.replace(destination)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
+def validate_pdf_file(path: Path) -> None:
+    if not path.is_file():
+        raise RuntimeError(f"compiled PDF was not found: {path}")
+    with path.open("rb") as handle:
+        header = handle.read(5)
+    if header != b"%PDF-" or path.stat().st_size <= 5:
+        raise RuntimeError(f"compiler produced an invalid PDF file: {path}")
 
 
 def relative_project_path(path: Path, project_dir: Path) -> str:
@@ -196,6 +317,8 @@ def validate_prepare_qa(report: dict[str, object]) -> list[str]:
         failures.append("figure captions contain manual numbers")
     if qa.get("missing_reference_entries"):
         failures.append("citations are missing reference-list entries")
+    if qa.get("invalid_citation_markers"):
+        failures.append("citation markers use invalid numeric syntax")
     if qa.get("tables_without_adjacent_caption"):
         failures.append("Markdown pipe tables are missing adjacent Pandoc captions")
     if qa.get("invalid_table_captions"):
@@ -226,10 +349,16 @@ def validate_postprocess_qa(qa: dict[str, object]) -> list[str]:
         failures.append("longtable captions are missing")
     if qa.get("longtables_missing_endfoot") not in (0, None):
         failures.append("longtable continuation footers are missing")
+    if qa.get("longtables_missing_endlastfoot") not in (0, None):
+        failures.append("longtable final-page footers are missing")
     if qa.get("longtables_missing_continued_caption") not in (0, None):
         failures.append("longtable continued captions are missing")
     if qa.get("longtable_headers_centered") is not True:
         failures.append("longtable headers are not centered")
+    if qa.get("longtable_cells_centered") is not True:
+        failures.append("longtable cells are not centered")
+    if qa.get("longtable_columns_vertical_centered") is not True:
+        failures.append("longtable columns are not vertically centered")
     if qa.get("table_captions_with_manual_numbers"):
         failures.append("manual table caption numbers remain")
     if qa.get("toc_section_font_size") != "4":
@@ -251,23 +380,50 @@ def validate_postprocess_qa(qa: dict[str, object]) -> list[str]:
     return failures
 
 
-def compile_tex(tex_path: Path, expected_pdf: Path, cwd: Path) -> None:
+def compile_tex(
+    tex_path: Path,
+    expected_pdf: Path,
+    cwd: Path,
+    timeout: float,
+    keep_intermediates: bool,
+) -> None:
     expected_pdf.parent.mkdir(parents=True, exist_ok=True)
-    tectonic = shutil.which("tectonic")
-    if tectonic:
-        run([tectonic, str(tex_path)], cwd=cwd)
-    else:
-        xelatex = shutil.which("xelatex")
-        if not xelatex:
-            raise RuntimeError("No LaTeX compiler found. Install or expose tectonic, or provide xelatex on PATH.")
-        for _ in range(2):
-            run([xelatex, "-interaction=nonstopmode", "-halt-on-error", str(tex_path)], cwd=cwd)
+    with tempfile.TemporaryDirectory(prefix="md-course-report-compile-", dir=expected_pdf.parent) as tmp:
+        compile_dir = Path(tmp)
+        tectonic = shutil.which("tectonic")
+        if tectonic:
+            command = [tectonic, "--outdir", str(compile_dir)]
+            if keep_intermediates:
+                command.extend(["--keep-intermediates", "--keep-logs"])
+            command.append(str(tex_path))
+            run(command, cwd=cwd, timeout=timeout)
+        else:
+            xelatex = shutil.which("xelatex")
+            if not xelatex:
+                raise RuntimeError("No LaTeX compiler found. Install or expose tectonic, or provide xelatex on PATH.")
+            for _ in range(2):
+                run(
+                    [
+                        xelatex,
+                        "-interaction=nonstopmode",
+                        "-halt-on-error",
+                        f"-output-directory={compile_dir}",
+                        str(tex_path),
+                    ],
+                    cwd=cwd,
+                    timeout=timeout,
+                )
 
-    produced_pdf = tex_path.with_suffix(".pdf")
-    if produced_pdf != expected_pdf and produced_pdf.exists():
-        shutil.copy2(produced_pdf, expected_pdf)
-    if not expected_pdf.exists():
-        raise RuntimeError(f"compile finished but PDF was not found: {expected_pdf}")
+        produced_pdf = compile_dir / tex_path.with_suffix(".pdf").name
+        validate_pdf_file(produced_pdf)
+        atomic_copy(produced_pdf, expected_pdf)
+        if keep_intermediates:
+            base_name = tex_path.stem
+            for suffix in GENERATED_SUFFIXES:
+                generated = compile_dir / f"{base_name}{suffix}"
+                if generated.is_file():
+                    shutil.copy2(generated, Path(str(tex_path.with_suffix("")) + suffix))
+    validate_pdf_file(expected_pdf)
 
 
 def cleanup_intermediates(tex_path: Path, expected_pdf: Path) -> None:
@@ -282,6 +438,7 @@ def cleanup_intermediates(tex_path: Path, expected_pdf: Path) -> None:
 
 def main() -> int:
     args = parse_args()
+    project_lock: TextIO | None = None
     skill_dir = Path(__file__).resolve().parents[1]
     prepare_script = skill_dir / "scripts" / "prepare_course_report.py"
     postprocess_script = skill_dir / "scripts" / "postprocess_course_tex.py"
@@ -292,8 +449,10 @@ def main() -> int:
     try:
         pandoc = require_tool("pandoc", "Markdown to LaTeX conversion")
         source = args.source.resolve()
-        if not source.exists():
+        if not source.is_file():
             raise RuntimeError(f"source Markdown was not found: {source}")
+        if args.command_timeout <= 0:
+            raise RuntimeError("--command-timeout must be greater than zero")
         if args.skip_compile and args.output_pdf:
             raise RuntimeError("--output-pdf requires compilation; omit --output-pdf when using --skip-compile.")
         if not args.no_cover and not source_has_thesis_front_matter(source):
@@ -330,7 +489,11 @@ def main() -> int:
                 "--tex must be inside the source Markdown directory so relative images compile; "
                 "use --output-pdf to copy the final PDF elsewhere."
             )
+        if work_dir.exists() and not work_dir.is_dir():
+            raise RuntimeError(f"--work-dir must be a directory path: {work_dir}")
+        validate_generated_path_collisions(source, work_dir, tex_path, pdf_path, output_pdf)
         work_dir.mkdir(parents=True, exist_ok=True)
+        project_lock = acquire_project_lock(project_dir, args.command_timeout)
         logo_arg = "" if args.no_cover else args.logo
         if logo_arg:
             logo_arg = copy_logo_into_project(logo_arg, work_dir, project_dir)
@@ -362,7 +525,7 @@ def main() -> int:
             prepare_cmd.append("--no-cover")
         if args.allow_slide_draft:
             prepare_cmd.append("--allow-slide-draft")
-        run(prepare_cmd, cwd=project_dir)
+        run(prepare_cmd, cwd=project_dir, timeout=args.command_timeout)
 
         prepare_report = work_dir / "prepare_report.json"
         prepare = read_json(prepare_report)
@@ -388,11 +551,12 @@ def main() -> int:
                 "--metadata-file",
                 str(metadata),
                 "--resource-path=.",
-                pandoc_no_highlight_arg(pandoc),
+                pandoc_no_highlight_arg(pandoc, args.command_timeout),
                 "--output",
                 str(tex_path),
             ],
             cwd=project_dir,
+            timeout=args.command_timeout,
         )
 
         postprocess_qa = work_dir / "postprocess_qa.json"
@@ -406,6 +570,7 @@ def main() -> int:
                 str(postprocess_qa),
             ],
             cwd=project_dir,
+            timeout=args.command_timeout,
         )
 
         qa = read_json(postprocess_qa)
@@ -415,13 +580,13 @@ def main() -> int:
             return 1
 
         if not args.skip_compile:
-            compile_tex(tex_path, pdf_path, project_dir)
+            compile_tex(tex_path, pdf_path, project_dir, args.command_timeout, args.keep_intermediates)
             if output_pdf:
                 if not pdf_path.exists():
                     raise RuntimeError(f"PDF was not found for copy: {pdf_path}")
                 if output_pdf.resolve() != pdf_path.resolve():
-                    output_pdf.parent.mkdir(parents=True, exist_ok=True)
-                    shutil.copy2(pdf_path, output_pdf)
+                    atomic_copy(pdf_path, output_pdf)
+                    validate_pdf_file(output_pdf)
             if not args.keep_intermediates:
                 cleanup_intermediates(tex_path, pdf_path)
 
@@ -437,6 +602,9 @@ def main() -> int:
     except (OSError, subprocess.CalledProcessError, RuntimeError, json.JSONDecodeError) as exc:
         print(f"build_course_report failed: {exc}", file=sys.stderr)
         return 1
+    finally:
+        if project_lock is not None:
+            project_lock.close()
 
 
 if __name__ == "__main__":

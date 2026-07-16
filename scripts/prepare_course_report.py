@@ -134,6 +134,8 @@ def is_url_path(path: str) -> bool:
 
 def resolve_project_asset(path: str, source_dir: Path, allow_absolute: bool = False) -> tuple[str, bool, bool]:
     cleaned = path.strip().strip("<>")
+    if not is_url_path(cleaned):
+        cleaned = cleaned.split("#", 1)[0].replace(r"\ ", " ")
     if not cleaned or is_url_path(cleaned):
         return cleaned, False, False
     candidate = Path(cleaned)
@@ -220,8 +222,10 @@ def split_reference_section(body: str) -> tuple[str, str]:
 
 def detect_slide_draft(lines: list[str]) -> dict[str, object]:
     """Detect page-by-page PPT drafts that are not course-report sources."""
-    page_heading_count = sum(1 for line in lines if SLIDE_PAGE_HEADING_RE.match(line.strip()))
-    slide_field_count = sum(1 for line in lines if SLIDE_FIELD_RE.match(line.strip()))
+    protected = protected_line_indexes(lines)
+    visible_lines = [line for idx, line in enumerate(lines) if idx not in protected]
+    page_heading_count = sum(1 for line in visible_lines if SLIDE_PAGE_HEADING_RE.match(line.strip()))
+    slide_field_count = sum(1 for line in visible_lines if SLIDE_FIELD_RE.match(line.strip()))
     text_fence_count = sum(1 for line in lines if line.strip() == "```text")
     detected = page_heading_count >= 3 and slide_field_count >= 6
     return {
@@ -232,23 +236,36 @@ def detect_slide_draft(lines: list[str]) -> dict[str, object]:
     }
 
 
+def parse_numeric_marker(marker: str) -> tuple[list[int], bool]:
+    normalized = marker.replace("，", ",").replace("、", ",").replace("–", "-").replace("—", "-")
+    numbers: set[int] = set()
+    parts = re.split(r"\s*,\s*", normalized)
+    if not parts or any(not part.strip() for part in parts):
+        return [], False
+    for part in parts:
+        part = part.strip()
+        if re.fullmatch(r"\d+", part):
+            number = int(part)
+            if number <= 0:
+                return [], False
+            numbers.add(number)
+            continue
+        range_match = re.fullmatch(r"(\d+)\s*-\s*(\d+)", part)
+        if not range_match:
+            return [], False
+        start, end = map(int, range_match.groups())
+        if not (0 < start <= end <= start + 50):
+            return [], False
+        numbers.update(range(start, end + 1))
+    return sorted(numbers), True
+
+
 def expand_numeric_markers(markers: list[str]) -> list[int]:
     numbers: set[int] = set()
     for marker in markers:
-        normalized = marker.replace("，", ",").replace("、", ",").replace("–", "-").replace("—", "-")
-        for part in re.split(r"\s*,\s*", normalized):
-            part = part.strip()
-            if not part:
-                continue
-            if "-" in part:
-                start_text, end_text = [item.strip() for item in part.split("-", 1)]
-                if start_text.isdigit() and end_text.isdigit():
-                    start, end = int(start_text), int(end_text)
-                    if 0 < start <= end <= start + 50:
-                        numbers.update(range(start, end + 1))
-                continue
-            if part.isdigit():
-                numbers.add(int(part))
+        parsed, valid = parse_numeric_marker(marker)
+        if valid:
+            numbers.update(parsed)
     return sorted(numbers)
 
 
@@ -338,9 +355,78 @@ def mask_span(match: re.Match[str]) -> str:
     return " " * (match.end() - match.start())
 
 
+def find_balanced_delimiter(text: str, opening: int, left: str, right: str) -> int | None:
+    if opening >= len(text) or text[opening] != left:
+        return None
+    depth = 1
+    quote = ""
+    escaped = False
+    position = opening + 1
+    while position < len(text):
+        char = text[position]
+        if escaped:
+            escaped = False
+        elif char == "\\":
+            escaped = True
+        elif quote:
+            if char == quote:
+                quote = ""
+        elif left == "(" and char in {'"', "'"}:
+            quote = char
+        elif char == left:
+            depth += 1
+        elif char == right:
+            depth -= 1
+            if depth == 0:
+                return position
+        position += 1
+    return None
+
+
+def mask_markdown_links_and_images(text: str) -> str:
+    masked = list(text)
+    position = 0
+    while position < len(text):
+        start = position
+        if text.startswith("![", position):
+            label_open = position + 1
+        elif text[position] == "[":
+            label_open = position
+        else:
+            position += 1
+            continue
+        label_close = find_balanced_delimiter(text, label_open, "[", "]")
+        if label_close is None:
+            position += 1
+            continue
+        target_open = label_close + 1
+        end: int | None = None
+        if target_open < len(text) and text[target_open] == "(":
+            target_close = find_balanced_delimiter(text, target_open, "(", ")")
+            if target_close is not None:
+                end = target_close + 1
+        elif target_open < len(text) and text[target_open] == "[":
+            target_close = find_balanced_delimiter(text, target_open, "[", "]")
+            if target_close is not None:
+                label = text[label_open + 1 : label_close]
+                target = text[target_open + 1 : target_close]
+                consecutive_numeric_citations = bool(
+                    re.fullmatch(r"[\d,\-\s，、–—]+", label)
+                    and re.fullmatch(r"[\d,\-\s，、–—]+", target)
+                )
+                if not consecutive_numeric_citations:
+                    end = target_close + 1
+        if end is None:
+            position = label_close + 1
+            continue
+        masked[start:end] = " " * (end - start)
+        position = end
+    return "".join(masked)
+
+
 def mask_inline_context(line: str) -> str:
     masked = re.sub(r"`[^`]*`", mask_span, line)
-    masked = re.sub(r"!?\[[^\]]*\]\([^)]+\)", mask_span, masked)
+    masked = mask_markdown_links_and_images(masked)
     def mask_reference_link(match: re.Match[str]) -> str:
         label = match.group(1).strip()
         if re.fullmatch(r"[\d,\-\s，、–—]+", label):
@@ -379,6 +465,22 @@ def collect_body_citations(body_before_refs: str) -> list[int]:
             continue
         markers.extend(CITATION_RE.findall(mask_inline_context(line)))
     return expand_numeric_markers(markers)
+
+
+def collect_invalid_body_citations(body_before_refs: str) -> list[str]:
+    lines = body_before_refs.splitlines()
+    protected = protected_line_indexes(lines)
+    table_lines = build_table_line_set(lines)
+    invalid: list[str] = []
+    for idx, line in enumerate(lines):
+        if idx in protected or idx in table_lines or LINK_DEFINITION_RE.match(line):
+            continue
+        for marker in CITATION_RE.finditer(mask_inline_context(line)):
+            _, valid = parse_numeric_marker(marker.group(1))
+            rendered = line[marker.start() : marker.end()]
+            if not valid and rendered not in invalid:
+                invalid.append(rendered)
+    return invalid
 
 
 def dedupe_repeated_citations(body: str) -> tuple[str, dict[str, object]]:
@@ -440,7 +542,6 @@ def dedupe_repeated_citations(body: str) -> tuple[str, dict[str, object]]:
         replaced_line = replace_citations_in_line(line, line_repl)
         if replaced_line != line:
             replaced_line = re.sub(r"[ \t]+([，。；：、,.!?;:])", r"\1", replaced_line)
-            replaced_line = re.sub(r"[ \t]{2,}", " ", replaced_line)
         out_lines.append(replaced_line)
 
     deduped_body = "\n".join(out_lines)
@@ -536,7 +637,11 @@ def prepare_body(lines: list[str]) -> tuple[list[str], str | None, list[str]]:
     output: list[str] = []
     warnings: list[str] = []
 
-    for line in lines:
+    protected = protected_line_indexes(lines)
+    for idx, line in enumerate(lines):
+        if idx in protected:
+            output.append(line)
+            continue
         match = HEADING_RE.match(line)
         if match and match.group(1) == "#" and title is None:
             title = strip_outer_title_marks(match.group(2))
@@ -623,11 +728,78 @@ def scan_pipe_tables(lines: list[str]) -> dict[str, object]:
     }
 
 
+def markdown_image_destination(raw_target: str) -> str:
+    target = raw_target.strip()
+    if not target:
+        return ""
+    if target.startswith("<"):
+        end = target.find(">")
+        destination = target[1:end] if end != -1 else target[1:]
+    else:
+        escaped = False
+        end = len(target)
+        for idx, char in enumerate(target):
+            if escaped:
+                escaped = False
+                continue
+            if char == "\\":
+                escaped = True
+                continue
+            if char.isspace():
+                end = idx
+                break
+        destination = target[:end]
+    if not is_url_path(destination):
+        destination = destination.split("#", 1)[0]
+    return destination.replace(r"\ ", " ")
+
+
+def extract_markdown_images(text: str) -> list[tuple[str, str]]:
+    images: list[tuple[str, str]] = []
+    opener = re.compile(r"!\[([^\]]*)\]\(")
+    pos = 0
+    while True:
+        match = opener.search(text, pos)
+        if not match:
+            break
+        idx = match.end()
+        start = idx
+        depth = 1
+        quote = ""
+        escaped = False
+        while idx < len(text):
+            char = text[idx]
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif quote:
+                if char == quote:
+                    quote = ""
+            elif char in {'"', "'"}:
+                quote = char
+            elif char == "(":
+                depth += 1
+            elif char == ")":
+                depth -= 1
+                if depth == 0:
+                    break
+            idx += 1
+        if depth != 0:
+            pos = match.end()
+            continue
+        destination = markdown_image_destination(text[start:idx])
+        images.append((match.group(1), destination))
+        pos = idx + 1
+    return images
+
+
 def scan_body(body: str, source_dir: Path) -> dict[str, object]:
     lines = body.splitlines()
     protected = protected_line_indexes(lines)
     scan_text = "\n".join("" if idx in protected else line for idx, line in enumerate(lines))
-    markdown_images = re.findall(r"!\[[^\]]*\]\(([^)]+)\)", scan_text)
+    markdown_image_items = extract_markdown_images(scan_text)
+    markdown_images = [item[1] for item in markdown_image_items]
     html_images = re.findall(r"<img\b[^>]*\bsrc=['\"]([^'\"]+)['\"]", scan_text, flags=re.I)
     images = markdown_images + html_images
     image_items = []
@@ -635,14 +807,11 @@ def scan_body(body: str, source_dir: Path) -> dict[str, object]:
         path, exists, inside_project = resolve_project_asset(image, source_dir)
         image_items.append({"path": path, "exists": exists, "inside_project": inside_project})
 
-    captions_with_numbers = [
-        caption
-        for caption in re.findall(r"!\[([^\]]+)\]\([^)]+\)", scan_text)
-        if re.match(r"\s*[图表]\s*\d+", caption)
-    ]
+    captions_with_numbers = [caption for caption, _ in markdown_image_items if re.match(r"\s*[图表]\s*\d+", caption)]
     table_qa = scan_pipe_tables(lines)
     body_before_refs, reference_section = split_reference_section(body)
     citations = collect_body_citations(body_before_refs)
+    invalid_citations = collect_invalid_body_citations(body_before_refs)
     references = extract_reference_numbers(reference_section)
 
     return {
@@ -656,6 +825,7 @@ def scan_body(body: str, source_dir: Path) -> dict[str, object]:
         **table_qa,
         "references_section_found": bool(reference_section),
         "citation_numbers": citations,
+        "invalid_citation_markers": invalid_citations,
         "reference_numbers": references,
         "missing_reference_entries": [n for n in citations if n not in references],
         "unused_reference_entries": [n for n in references if n not in citations],
@@ -745,6 +915,8 @@ def main() -> int:
         warnings.append("图片或表格 caption 含手写编号，可能与 LaTeX 自动编号重复。")
     if qa["missing_reference_entries"]:
         warnings.append("正文引用缺少参考文献条目：" + ", ".join(map(str, qa["missing_reference_entries"])))
+    if qa["invalid_citation_markers"]:
+        warnings.append("存在非法引用格式：" + ", ".join(qa["invalid_citation_markers"]))
     if qa["unused_reference_entries"]:
         warnings.append("存在未被正文引用的参考文献条目，请确认是否保留：" + ", ".join(map(str, qa["unused_reference_entries"])))
     if qa["tables_without_adjacent_caption"]:

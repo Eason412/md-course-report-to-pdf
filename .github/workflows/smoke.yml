@@ -19,7 +19,7 @@ jobs:
           python-version: "3.11"
 
       - name: Install Pandoc and fonts
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends pandoc fonts-noto-cjk
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends pandoc fonts-noto-cjk poppler-utils qpdf
 
       - name: Cache Tectonic packages
         uses: actions/cache@v5
@@ -36,9 +36,13 @@ jobs:
         run: tectonic --version
 
       - name: Check Python syntax
-        run: python3 -m py_compile scripts/*.py
+        run: python3 -m py_compile scripts/*.py tests/*.py
+
+      - name: Run regression tests
+        run: python3 -m unittest -v tests.test_regressions
 
       - name: Run smoke tests
         env:
           MD_COURSE_REPORT_REQUIRE_COMPILER: "1"
+          MD_COURSE_REPORT_REQUIRE_PDF_TOOLS: "1"
         run: python3 scripts/run_smoke_tests.py
