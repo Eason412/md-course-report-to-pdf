@@ -1,131 +1,42 @@
-# Markdown 课程报告转 PDF
-
-<p align="center">
-  <img src="assets/njust_logo.png" alt="南京理工大学校徽" width="96">
-</p>
-
-> 如果你在使用中遇到格式问题、构建失败、学校模板适配需求，或有更好的排版、QA、工作流建议，欢迎提交 GitHub Issue，也可以发邮件到 `huyi@njust.edu.cn`。邮件标题建议注明来意，例如 `md-course-report-to-pdf 使用反馈`、`课程报告 PDF 格式建议` 或 `Codex skill 改进建议`。
->
-> 本项目为个人维护的开源工具，不是南京理工大学官方模板或官方支持渠道；正式提交前请以学校、学院或任课教师的当前要求为准。
+# md-course-report-to-pdf
 
 [![Smoke Test](https://github.com/Eason412/md-course-report-to-pdf/actions/workflows/smoke.yml/badge.svg)](https://github.com/Eason412/md-course-report-to-pdf/actions/workflows/smoke.yml)
 
-<h2 align="center">📄 还在为 AI 生成的 Markdown 转 PDF 而烦恼吗？</h2>
+把中文 Markdown 课程报告、课程论文或作业报告转换为带封面、摘要、目录、图表编号、公式编号和参考文献的 LaTeX/PDF。它既可以安装为 Codex skill，也可以直接作为命令行工具运行。
 
-**别再为格式反复折腾了！这是一款可以解决你大部分格式问题的 Codex Skill。✨**
+项目内置 Pandoc/`ctexart` 模板、Markdown 与 LaTeX 两阶段 QA，以及 Tectonic/XeLaTeX 编译封装。模板参考了南京理工大学学位论文格式，但针对课程报告做了取舍；本项目不是学校官方模板，正式提交前仍应核对任课教师、学院或学校的当前要求。
 
-**把 AI 生成的 Markdown 课程报告、课程论文或作业报告，连同图片 🖼️、表格 📊、公式 🧮 和参考文献 📚，一键转换为标准 LaTeX/PDF 文档。**
+## 能做什么
 
-<h1 align="center">🚀 少调格式，多专注内容！🎓</h1>
+- 从一个 Markdown 文件生成课程报告封面、中文摘要、英文摘要、目录和正文。
+- 支持无封面模式，以及由 YAML front-matter 驱动的学位论文样式封面。
+- 将 Markdown pipe table 转换为可跨页的 `booktabs`/`longtable` 表格。
+- 自动编号章节、图片、表格和普通展示公式。
+- 将正文数字引用转换为上标引用，并检查引用与参考文献编号是否对应。
+- 检查图片路径、表题、手写编号、非法引用、未编号公式、目录配置和长表结构。
+- 在隔离目录中编译 LaTeX；同一报告目录中的并发构建会自动串行化，成功 PDF 以原子方式写入。
 
-## ❌❌ 错误排查 ❌❌
+详细排版规则、官方规范映射和已知偏离见 [`references/format-qa.md`](references/format-qa.md)。
 
-### 最容易出错的 4 个点
+## 前置条件
 
-1. **缺少中文摘要、英文摘要和关键词**
-   - 检查是否有 `## 摘要`
-   - 检查是否有 `关键词：...`
-   - 检查是否有 `## Abstract`
-   - 检查是否有 `Keywords: ...`
+运行构建脚本需要：
 
-2. **正文没有按报告章节组织**
-   - 建议使用 `## 引言`
-   - 建议使用 `## 正文分析`
-   - 建议使用 `## 讨论`
-   - 建议使用 `## 结论`
+- Python 3；仓库 CI 使用 Python 3.11。
+- [Pandoc](https://pandoc.org/)；命令名为 `pandoc`。
+- LaTeX 编译器：优先使用 `tectonic`，未找到时回退到 `xelatex`。
 
-3. **图片、表格、公式写法不标准**
-   - 图片使用 `![图题](image/xxx.png)`
-   - 表格使用 Markdown pipe table
-   - 表题紧跟表格下一行：`: 表题`
-   - 公式使用 LaTeX 数学语法
-
-4. **参考文献和正文引用没有对应**
-   - 正文引用使用 `[1]`
-   - 文末条目使用 `[1] 作者. 题名[J]. 期刊, 年份.`
-   - 有正文引用时，需要有 `## 参考文献`
-
-### 标准 Markdown 要求
-
-转换前请先参考 [examples/标准课程报告模板.md](examples/标准课程报告模板.md)，并对照下方 `## Markdown 写法 📝` 检查源文件。标准课程报告通常应包含：
-
-- 题目
-- 中文摘要和关键词
-- 英文摘要和 Keywords
-- 按章节组织的正文，不需要手写章节编号
-- 标准 Markdown 图片、表格和公式
-- 有正文引用时，提供与引用编号对应的参考文献；无引用短作业可以省略参考文献区
-
-## 适用场景
-
-- 中文课程报告、结课论文、作业报告、专题综述。
-- 需要封面、摘要、目录、正文、图表、公式和参考文献的 PDF。
-- 希望用 Markdown 写作，但最终提交格式稳定的 PDF。
-- 希望让 Codex 按固定流程完成排版、编译和 QA。
-
-这个项目面向课程报告，不是完整学位论文提交模板。若用于正式学位论文，请以学校或学院当前正式模板为准。
-
-## 格式来源
-
-模板参照南京理工大学学位论文官方格式规范。仓库内同时提供二进制原件和转换后的可读文本版，便于查阅与逐条比对：
-
-```text
-references/njust-thesis-format.doc   官方格式原始 Word 文件
-references/njust-thesis-format.md    转换后的可读文本版（章节对照用）
-```
-
-`references/format-qa.md` 中的「NJUST Source Format Mapping And Deviations」一节，记录了本项目逐条照搬了官方哪些规则、又在哪些地方为适配课程报告而有意偏离。
-
-当前已实现的主要格式：
-
-- A4 页面；上 30 mm、下 24 mm、左 25 mm、右 25 mm。
-- 正文小四号宋体，固定 20 bp 行距；英文和数字优先使用 Times New Roman。
-- 一级标题小三号加粗宋体，段前/段后 18 bp；二级标题四号加粗宋体，段前/段后 12 bp；三级标题小四号加粗宋体，段前/段后 6 bp。
-- 中文摘要、英文摘要和目录置于正文前；正文页码重新从 1 开始。
-- 目录：标题三号加粗居中；一级条目（章、致谢、参考文献、附录）四号加粗宋体，子级小四号宋体，对齐官方规范 §2.5。
-- 图题在图下，表题在表上，图题/表题使用五号宋体。
-- 图、表、公式按章节编号，例如 `图 2.1`、`表 2.1`、`（2.1）`。
-- 参考文献另页开始，标题居中。
-- 可选地通过 Markdown 顶部 front-matter 生成学位论文封面（官方附件 2.1 版式），含分类号、密级、UDC、学位类型、题名/副题名、作者、指导教师及职称、学位类别、学科/专业名称、研究方向、论文提交时间等字段；使用 `cover: thesis` 或下文列出的核心触发字段时切换，其他情况保持课程报告封面。
-
-尚未实现或不会自动检查的学位论文格式：
-
-- 书脊（封面侧边题名与单位）、封面纸张与颜色等装订要求。
-- 封二、英文封二、原创性声明、学位论文使用授权声明。
-- 奇偶页不同页眉、外侧页码、双面印刷。
-- 图表目录、注释表、脚注/文后注释系统。
-- 摘要字数、关键词 3-8 个、参考文献数量和外文/近年文献比例。
-- 图的自明性、分图 `a)`/`b)`、坐标轴量纲、表内空白/破折号含义等内容规范。
-- 附录 A/B 编号、附录图表编号、匿名送审信息隐藏、计量单位规范。
-
-## 功能亮点 ✨
-
-- 生成包含课程名称、姓名、学号的封面；支持通过 front-matter 生成学位论文封面（可选）。
-- 自动抽取中文摘要、英文摘要和关键词。
-- 生成目录，并区分前置页罗马页码与正文阿拉伯页码。
-- 将 Markdown pipe table 转为 booktabs/longtable 风格表格。
-- 通过 Pandoc 语义树为普通展示公式生成编号，并把正文数字引用转为上标；代码、链接、图片标签和原始 LaTeX 不会被正则误改。
-- 清理重复数字引用，保留第一次有效正文引用，并拒绝 `[1-3-5]` 等非法编号格式。
-- 输出 JSON QA，检查图片、表题、引用、公式、目录和封面字段布局。
-- 隔离编译临时文件，串行化同目录并发构建，并以原子替换方式写入成功的 PDF。
-
-## 环境要求
-
-- Python 3.10 或更新版本。
-- Pandoc。
-- LaTeX 编译器：优先使用 `tectonic`，也支持 `xelatex`。
-
-macOS 可以用 Homebrew 安装基础依赖：
+先确认命令能够从终端找到：
 
 ```bash
-brew install pandoc tectonic
+python3 --version
+pandoc --version
+tectonic --version
 ```
 
-如果使用 `xelatex`，请安装完整 TeX 发行版，例如 MacTeX 或 TeX Live。
+如果只想检查 Markdown、生成 LaTeX 和查看 QA，可以不安装 LaTeX 编译器，并在构建时使用 `--skip-compile`。
 
-## 安装
-
-作为 Codex skill 使用：
+## 安装为 Codex skill
 
 ```bash
 mkdir -p "${CODEX_HOME:-$HOME/.codex}/skills"
@@ -133,53 +44,160 @@ git clone https://github.com/Eason412/md-course-report-to-pdf.git \
   "${CODEX_HOME:-$HOME/.codex}/skills/md-course-report-to-pdf"
 ```
 
-作为普通命令行工具使用：
+安装后可以在 Codex 中直接描述任务，例如：
 
-```bash
-git clone https://github.com/Eason412/md-course-report-to-pdf.git
-cd md-course-report-to-pdf
-python3 scripts/run_smoke_tests.py
+```text
+请使用 $md-course-report-to-pdf 把 ./report.md 转成课程报告 PDF。
+课程名称是“机器学习”，姓名是“张三”，学号是“20260001”。
 ```
+
+如果不需要封面，应明确说明：
+
+```text
+请使用 $md-course-report-to-pdf 把 ./report.md 转成 PDF，不加入封面。
+```
+
+skill 的完整代理工作流见 [`SKILL.md`](SKILL.md)。
 
 ## 快速开始
 
-在报告项目目录中运行：
+下面的命令从标准模板创建一份报告，并生成 `report.pdf`。所有命令都在你准备存放报告的目录中执行。
 
 ```bash
 SKILL_DIR="${CODEX_HOME:-$HOME/.codex}/skills/md-course-report-to-pdf"
-python3 "$SKILL_DIR/scripts/build_course_report.py" input.md \
+
+mkdir -p my-course-report
+cp "$SKILL_DIR/examples/标准课程报告模板.md" my-course-report/report.md
+cd my-course-report
+
+python3 "$SKILL_DIR/scripts/build_course_report.py" report.md \
   --course "课程名称" \
   --student-name "姓名" \
   --student-id "学号" \
-  --output-pdf "course_report.pdf"
+  --pdf "report.pdf"
 ```
 
-如果需要指定封面 logo：
+成功时，命令退出码为 `0`，终端会输出一段 JSON 摘要，并在当前目录生成：
+
+```text
+report.pdf
+course_report.tex
+latex/report_body.md
+latex/metadata.yaml
+latex/prepare_report.json
+latex/postprocess_qa.json
+```
+
+构建或 QA 失败时，脚本会把原因写到标准错误并以非零状态退出。不要只看 PDF 是否存在；同时检查终端结果和两个 QA JSON 文件。
+
+如果不需要封面：
 
 ```bash
-python3 "$SKILL_DIR/scripts/build_course_report.py" input.md \
-  --course "课程名称" \
-  --student-name "姓名" \
-  --student-id "学号" \
-  --logo "assets/school_logo.png" \
-  --output-pdf "course_report.pdf"
+python3 "$SKILL_DIR/scripts/build_course_report.py" report.md \
+  --no-cover \
+  --pdf "report.pdf"
 ```
 
-如果仓库内存在 `assets/njust_logo.png`，脚本会把它作为默认 logo 使用。通过 `build_course_report.py` 指定 `--logo` 时可以使用绝对路径，脚本会复制到项目内生成目录；AI 生成的正文图片需要先保存到本地项目目录，并在 Markdown 中使用相对路径引用。
+如果只想把仓库当作普通命令行工具使用，可以把 `SKILL_DIR` 指向任意 clone 下来的仓库目录，不要求它位于 Codex skills 目录。
 
-如果你不需要封面，使用 Codex skill 时可以直接告诉 AI「不加入封面」；命令行使用时加上 `--no-cover` 即可。
+## Markdown 输入规则
 
-## 学位论文封面
+建议从 [`examples/标准课程报告模板.md`](examples/标准课程报告模板.md) 开始修改。最小结构如下：
 
-复制 `examples/学位论文模板.md`，在文件顶部填写 YAML front-matter 字段，然后直接运行构建——**无需传入 `--course`、`--student-name`、`--student-id` 等课程报告参数**：
+```markdown
+# 课程报告题目
 
-```bash
-SKILL_DIR="${CODEX_HOME:-$HOME/.codex}/skills/md-course-report-to-pdf"
-python3 "$SKILL_DIR/scripts/build_course_report.py" 学位论文.md \
-  --output-pdf "thesis.pdf"
+## 摘要
+
+这里写中文摘要。
+
+关键词：关键词一；关键词二；关键词三
+
+## Abstract
+
+Write the English abstract here.
+
+Keywords: keyword one; keyword two; keyword three
+
+## 引言
+
+这里写正文，并在需要的位置引用文献[1]。
+
+## 结论
+
+这里写结论。
+
+## 参考文献
+
+[1] 作者. 文献题名[J]. 期刊名, 年份, 卷(期): 页码.
 ```
 
-front-matter 写在 Markdown 文件最顶部，格式如下：
+需要注意：
+
+- 全文只保留一个 `#` 作为报告题目；正文从 `##` 开始。
+- 不要在标题中手写 `1.`、`1.1` 等章节编号。
+- 图片必须是报告目录内可以解析的相对路径；远程 URL、绝对路径和跳出报告目录的路径会被 QA 拒绝。
+- 正文引用使用 `[1]`、`[1,2]`、`[1-3]` 等数字形式，文末应存在对应编号的参考文献。
+- 本工具不会替你核实参考文献真伪，也不会自动运行 CSL/`citeproc`；作者、题名、年份、DOI 和 URL 仍需人工核对。
+- 默认会拒绝逐页讲稿或幻灯片草稿；只有明确需要原样转换时才使用 `--allow-slide-draft`。
+
+### 图片
+
+把图片放在报告目录内，例如：
+
+```text
+report.md
+image/
+  method_flow.png
+```
+
+在 Markdown 中使用相对路径：
+
+```markdown
+![方法流程图](image/method_flow.png)
+```
+
+图片说明只写标题，不要手写“图 1”，模板会自动编号。
+
+### 表格
+
+使用 Markdown pipe table，并在表格后紧跟 Pandoc 表题；表格与表题之间不能有空行：
+
+```markdown
+| 方案 | 优势 | 约束 |
+|---|---|---|
+| 方案 A | 易于实现 | 依赖输入质量 |
+| 方案 B | 效果稳定 | 成本较高 |
+: 方案对比
+```
+
+表题必须写成 `: 标题`。不要写 `表: 标题`，也不要手写 `: 表 1 标题`。
+
+### 公式
+
+普通展示公式使用 LaTeX 数学语法：
+
+```markdown
+$$
+E = mc^2
+$$
+```
+
+过滤器会为普通展示公式生成编号。需要对齐、标签或特殊编号时，可以显式使用 `align` 或 `equation` 环境；原始 LaTeX 块会保留。
+
+## 三种封面模式
+
+| 模式 | 如何启用 | 所需信息 |
+| --- | --- | --- |
+| 课程报告封面 | 默认模式 | `--course`、`--student-name`、`--student-id` |
+| 无封面 | `--no-cover` | 不需要课程名称、姓名、学号或 logo |
+| 学位论文样式封面 | Markdown 顶部设置 `cover: thesis` | 使用 front-matter 字段，不要求课程报告三字段 |
+
+课程报告封面默认使用 skill 内的 `assets/njust_logo.png`。如需其他 logo，可以传入 `--logo path/to/logo.png`；构建脚本会把外部 logo 复制到报告的生成目录中。校徽和其他机构标识可能受额外权利限制，分发或提交前应确认使用权限。
+
+### 学位论文样式封面
+
+可以复制 [`examples/学位论文模板.md`](examples/学位论文模板.md)，或者在 Markdown 文件最顶部加入：
 
 ```yaml
 ---
@@ -196,200 +214,129 @@ advisor_title: 教授
 degree_category: 工学硕士
 discipline: 计算机科学与技术
 research_field: 计算机视觉
-submit_date: 2025 年 6 月
+submit_date: 2026 年 6 月
 ---
 ```
 
-支持的 front-matter 字段：
+`degree_type`、`advisor`、`degree_category`、`discipline`、`research_field` 中任一字段非空也会触发学位论文封面；建议显式填写 `cover: thesis`，避免意外切换。命令行参数优先于 front-matter 中的同类字段。
 
-| 字段 | 含义 | 示例 |
-|---|---|---|
-| `cover` | 封面类型，填 `thesis` 强制使用学位论文封面；未填写时，`degree_type`、`advisor`、`degree_category`、`discipline`、`research_field` 中任一非空也会自动切换 | `thesis` |
-| `classification` / `分类号` | 分类号 | `TP391` |
-| `secrecy` / `密级` | 密级 | `公开` |
-| `udc` / `UDC` | UDC 号 | `004.8` |
-| `degree_type` / `学位类型` | 学位类型行文字 | `硕士学位论文` |
-| `title` / `题目` | 题名（也可用正文首个 `#`） | `基于深度学习的…` |
-| `subtitle` / `副标题` | 副题名（可选） | `以遥感图像为例` |
-| `author` / `作者` | 作者姓名 | `张三` |
-| `advisor` / `指导教师` | 指导教师姓名 | `李四` |
-| `advisor_title` / `职称` | 指导教师职称 | `教授` |
-| `degree_category` / `学位类别` | 学位类别 | `工学硕士` |
-| `discipline` / `学科名称` | 学科或专业名称 | `计算机科学与技术` |
-| `discipline_label` | 标签文字，默认「学科名称」，需要时改为「专业名称」 | `专业名称` |
-| `research_field` / `研究方向` | 研究方向 | `计算机视觉` |
-| `submit_date` / `论文提交时间` | 论文提交时间 | `2025 年 6 月` |
+这个封面只覆盖仓库已实现的附件 2.1 样式。书脊、封二、英文封二、原创性声明、使用授权声明、双面印刷页眉页脚等要求不在当前自动化范围内。
 
-留空的字段在封面上显示为空下划线。命令行参数（如 `--course`、`--student-name`）若同时提供，会覆盖 front-matter 中对应的值。只有 `cover: thesis` 或上述 5 个核心触发字段会自动切换封面；`classification`、`secrecy`、`udc`、`author`、`advisor_title`、`submit_date` 是学位封面的补充字段，单独填写不会触发切换。未触发时自动回退到课程报告封面，行为与之前完全一致。
+## 输出文件
 
-> 学位论文封面样式参照官方「附件 2.1」版式。正式提交前请以学校或学院当前要求为准。
+所有相对路径都以源 Markdown 所在目录为基准。
 
-## Markdown 写法 📝
+| 输出 | 默认值 | 说明 |
+| --- | --- | --- |
+| LaTeX | `course_report.tex` | Pandoc 生成并经过后处理的完整 TeX |
+| PDF | `course_report.pdf` | 使用 `--pdf` 可以更改文件名，但路径必须位于报告目录内 |
+| 工作目录 | `latex/` | 存放预处理正文、元数据和 QA JSON |
+| 额外 PDF 副本 | 不生成 | 使用 `--output-pdf PATH` 将成功 PDF 再复制到指定位置 |
 
-### 标题、摘要和关键词
+`--output-pdf` 只能在实际编译 PDF 时使用，不能与 `--skip-compile` 同时使用。
 
-第一个 `#` 会作为报告标题；正文从 `##` 及更低级标题开始。建议不要手写 `1.`、`2.1` 等章节编号，模板会自动编号。
+## 常用参数
 
-```markdown
-# 课程报告题目
+| 参数 | 作用 |
+| --- | --- |
+| `--course TEXT` | 课程名称 |
+| `--student-name TEXT` | 学生姓名 |
+| `--student-id TEXT` | 学号 |
+| `--logo PATH` | 指定封面 logo |
+| `--no-cover` | 不生成封面 |
+| `--allow-slide-draft` | 允许转换被识别为逐页讲稿/幻灯片草稿的输入 |
+| `--work-dir PATH` | 修改工作目录；必须位于源 Markdown 目录内 |
+| `--tex PATH` | 修改 TeX 输出；必须位于源 Markdown 目录内 |
+| `--pdf PATH` | 修改主 PDF 输出；必须以 `.pdf` 结尾 |
+| `--output-pdf PATH` | 把最终 PDF 额外复制到指定位置 |
+| `--keep-intermediates` | 保留 `.aux`、`.log`、`.toc` 等 LaTeX 中间文件 |
+| `--skip-compile` | 运行预处理、Pandoc 和后处理，但不编译 PDF |
+| `--command-timeout SECONDS` | 每个外部命令的超时时间；默认 `180` 秒 |
 
-## 摘要
-
-这里写中文摘要。
-
-关键词：关键词一；关键词二；关键词三
-
-## Abstract
-
-This is the English abstract.
-
-Keywords: keyword one; keyword two; keyword three
-
-## 研究背景
-
-这里写正文。
-```
-
-### 图片
-
-图片路径应相对报告项目根目录。不要使用绝对路径、远程 URL 或跳出项目目录的路径。
-
-```markdown
-![方法流程图](image/figure_01.png)
-```
-
-标准 Markdown 图片标题和片段也可以使用，例如 `![方法流程图](image/figure_01.png#preview "可选标题")`；QA 只把真正的文件路径用于存在性检查。
-
-不要在图片说明中手写 `图 1`，否则会和自动编号重复。
-
-### 表格
-
-推荐使用 Markdown pipe table，并在表格后紧跟 Pandoc 表题，中间不要空行。Markdown 源文件里表题写在表格后面，最终 PDF 会把表题渲染到表格上方。
-
-```markdown
-| 方案 | 优势 | 约束 |
-|---|---|---|
-| 方案 A | 易于实现 | 依赖输入质量 |
-| 方案 B | 效果稳定 | 成本较高 |
-: 方案对比
-```
-
-表题使用 `: 标题`，不要写 `表: 标题` 或手写 `表 1`。
-
-### 公式
-
-普通展示公式可以直接写：
-
-```markdown
-$$
-E = mc^2
-$$
-```
-
-Pandoc Lua 过滤器会把语义化的未编号展示公式转为编号公式环境。需要特殊对齐或标签时，可以显式使用 `align` 或 `equation`；代码块和原始 LaTeX 块会原样保留。
-
-### 引用和参考文献
-
-正文中使用数字引用：
-
-```markdown
-该方法适合用于报告排版自动化场景[1]。
-```
-
-参考文献使用简洁数字列表：
-
-```markdown
-## 参考文献
-
-[1] 作者. 文献题名[J]. 期刊名, 年份, 卷(期): 页码.
-```
-
-新增参考文献前应核对官方来源、出版商页面或可靠数据库；不要编造作者、年份、DOI、URL 或期刊信息。
-
-## 构建输出和 QA
-
-默认构建会在源 Markdown 所在目录生成：
-
-```text
-course_report.pdf              默认 PDF 输出
-course_report.tex              生成的 LaTeX 文件
-latex/report_body.md           预处理后的正文
-latex/metadata.yaml            模板元数据
-latex/prepare_report.json      Markdown 预处理 QA
-latex/postprocess_qa.json      LaTeX 后处理 QA
-```
-
-常用参数：
-
-- `--output-pdf PATH`：额外复制最终 PDF 到指定路径。
-- `--keep-intermediates`：保留 `.aux`、`.log`、`.toc` 等 LaTeX 中间文件。
-- `--skip-compile`：只检查预处理、Pandoc 转换和后处理，不编译 PDF。该参数不能和 `--output-pdf` 同时使用。
-- `--allow-slide-draft`：强制转换逐页讲稿或幻灯片内容稿。默认会拦截这类输入，因为它通常缺少摘要、正式章节和参考文献，直接转换不像课程报告。
-- `--command-timeout SECONDS`：设置每个 Pandoc/LaTeX 子进程的最长运行时间，默认 180 秒。超时或编译失败时会保留命令退出信息和编译器诊断。
-
-同一 Markdown 目录下的构建会自动串行化，避免并发任务覆盖 `latex/report_body.md` 等固定中间文件。LaTeX 在隔离临时目录中编译；只有生成并验证了有效 PDF 后，脚本才会原子替换 `--pdf`，再按需复制到 `--output-pdf`。
-
-重点 QA 字段：
-
-- `missing_images`：图片文件是否缺失。
-- `unsafe_image_paths`：图片路径是否为绝对路径、远程路径或越出项目目录。
-- `captions_with_manual_numbers`：图片说明是否手写编号。
-- `missing_reference_entries`：正文引用是否缺少参考文献条目。
-- `invalid_citation_markers`：是否存在无法安全解释的数字引用格式。
-- `tables_without_adjacent_caption`：表格是否缺少紧邻表题。
-- `remaining_unnumbered_display_math`：是否仍有未编号展示公式。
-- `reference_urls`：参考文献中是否保留了不需要的 URL。
-- `cover_fields_use_makebox_centering`：封面字段是否居中。
-- `longtables_missing_endfoot` / `longtables_missing_endlastfoot`：跨页长表的非末页/末页底线是否完整。
-- `longtable_cells_centered` / `longtable_columns_vertical_centered`：长表单元格是否水平、垂直居中。
-
-## 测试 ✅
+完整参数以当前脚本输出为准：
 
 ```bash
-python3 scripts/run_smoke_tests.py
-python3 -m unittest -v tests.test_regressions
-python3 -m py_compile scripts/*.py tests/*.py
+python3 scripts/build_course_report.py --help
 ```
 
-回归测试固定内容保护、路径碰撞、超时、图片解析、引用、公式和长表后处理等历史缺陷。smoke test 会渲染仓库示例和一个真实跨页长表，校验 JSON QA，并在本机存在 `tectonic` 或 `xelatex` 时编译 PDF；若同时存在 Poppler/qpdf，还会独立检查 PDF 头、页数、A4 纵向尺寸、嵌入字体、图片对象、续表文字和文件结构。GitHub Actions 会安装这些工具并强制覆盖真实 PDF 编译路径。
+## QA 与构建安全
+
+构建过程会生成两份主要检查报告：
+
+- `latex/prepare_report.json`：检查 Markdown 输入、图片、表题、引用、摘要和封面元数据。
+- `latex/postprocess_qa.json`：检查生成的 LaTeX、目录、公式、表格、长表续页和封面布局。
+
+端到端脚本会把关键 QA 失败视为构建失败，例如：
+
+- 图片缺失或路径越出报告目录；
+- 图片题、表题中存在手写编号；
+- pipe table 缺少紧邻表题；
+- 正文引用缺少参考文献条目或引用格式无法安全解释；
+- 展示公式仍未编号；
+- 长表缺少续表标题、重复表头或末页底线；
+- 目录或封面布局没有满足模板约束。
+
+构建器还会阻止源文件与 TeX/PDF/中间文件发生路径碰撞，为同一报告目录加构建锁，对外部命令应用超时，并且只在编译出有效 PDF 后替换最终输出。
+
+这些检查不能代替人工阅览。提交前至少检查封面、摘要、目录、正文第一页、跨页表格、参考文献页和最终页。
+
+## 测试
+
+在仓库根目录运行：
+
+```bash
+python3 -m py_compile scripts/*.py tests/*.py
+python3 -m unittest -v tests.test_regressions
+python3 scripts/run_smoke_tests.py
+```
+
+- 回归测试覆盖路径碰撞、并发锁、超时诊断、标题处理、图片解析、引用、公式和长表后处理。
+- smoke test 会处理仓库示例；本机存在 Tectonic 或 XeLaTeX 时还会真实编译 PDF。
+- GitHub Actions 会安装 Pandoc、Tectonic、Poppler 和 qpdf，并要求完整 PDF 路径通过。
+
+如果本地需要强制要求编译器和 PDF 工具全部存在，可以使用与 CI 相同的环境变量：
+
+```bash
+MD_COURSE_REPORT_REQUIRE_COMPILER=1 \
+MD_COURSE_REPORT_REQUIRE_PDF_TOOLS=1 \
+python3 scripts/run_smoke_tests.py
+```
 
 ## 仓库结构
 
 ```text
-SKILL.md                           Codex skill 使用说明
+SKILL.md                           Codex skill 工作流
 agents/openai.yaml                 skill 展示元数据
-assets/njust_logo.png              README 和默认封面 logo
 assets/templates/                  Pandoc/ctexart 模板
-examples/标准课程报告模板.md       可复制的标准 Markdown 模板
-examples/学位论文模板.md           学位论文封面 + 正文模板（front-matter 驱动）
-examples/                          smoke test Markdown 输入
-references/format-qa.md            详细排版和 QA 规则，含官方规范对照与偏离说明
-references/njust-thesis-format.doc 南京理工大学学位论文格式参考文件（二进制原件）
-references/njust-thesis-format.md  学位论文格式规范的可读文本版
-THIRD_PARTY_NOTICES.md             非 MIT 资产、来源与校验信息
-scripts/build_course_report.py     端到端构建封装
-scripts/prepare_course_report.py   Markdown 预处理和 QA
-scripts/postprocess_course_tex.py  LaTeX 后处理和 QA
-scripts/run_smoke_tests.py         smoke test 运行器
-tests/test_regressions.py          内容安全与构建可靠性回归测试
+examples/标准课程报告模板.md       可复制的课程报告模板
+examples/学位论文模板.md           学位论文样式封面模板
+references/format-qa.md            排版规则、QA 清单和规范映射
+scripts/build_course_report.py     端到端构建入口
+scripts/prepare_course_report.py   Markdown 预处理与 QA
+scripts/postprocess_course_tex.py  LaTeX 后处理与 QA
+scripts/run_smoke_tests.py         端到端 smoke test
+tests/test_regressions.py          回归测试
 ```
 
-## 常见问题 🛠️
+## 当前边界
 
-**找不到 Pandoc 或 LaTeX 编译器**：确认 `pandoc --version` 可运行；macOS 可用 `brew install pandoc tectonic`。如果暂时没有 LaTeX 编译器，可以先用 `--skip-compile` 检查 Markdown 和 LaTeX 后处理。
+- 这是面向课程报告的自动排版工具，不是完整的正式学位论文提交系统。
+- 模板提供字体回退，但不同系统的实际字体可能不同；学校要求固定字体时，应安装对应字体并检查最终 PDF。
+- QA 检查结构和已知错误模式，不判断论述质量、数据真实性、引用真实性、摘要字数或学校对参考文献数量的要求。
+- 图片内容、机构 logo、官方文档和用户自行提供的素材可能不属于本项目的 MIT 授权范围。
 
-**图片找不到**：从报告项目根目录运行构建命令，并在 Markdown 中写真实的项目内相对路径，例如 `image/figure_01.png` 或 `figures/result.png`。LaTeX 模板配置了 `./`、`image/`、`figures/`、`assets/` 作为编译搜索路径，但 QA 不会替你猜测文件夹，Markdown 里的路径必须能直接定位到文件。
+## 许可证与第三方材料
 
-**表格没有编号**：确认表格后紧跟 `: 标题`，中间没有空行。
+原创代码、模板、示例和仓库文档使用 [MIT License](LICENSE)。
 
-**出现重复的“图 1 图 1”**：删除 Markdown 图片说明或正文附近手写的 `图 1`，图片说明只保留纯标题。
+`assets/njust_logo.png`、南京理工大学官方格式原件及其可读转写件不属于 MIT License 的授权范围。来源、哈希和已知限制见 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)。这些材料的收录不表示南京理工大学对本项目的认可或背书。
 
-**参考文献 URL 导致行太长**：优先删除参考文献列表中不必要的原始 URL 或 DOI URL；如果学校要求保留 URL，再考虑调整模板断行。
+## 反馈与贡献
 
-**中文字体不可用**：模板默认优先使用 macOS 的 `Songti SC` 和 `Times New Roman`；英文字体不可用时回退到 `Liberation Serif` 或 `DejaVu Serif`，中文字体不可用时优先回退到 Noto CJK 字体。若学校有固定字体要求，请安装对应字体或修改 `assets/templates/ctexart-course-report.tex`。
+发现构建失败、格式回归或文档错误时，请提交 [GitHub Issue](https://github.com/Eason412/md-course-report-to-pdf/issues)，并尽量附上：
 
-## 开源说明
-
-代码、脚本、示例 Markdown 和原创仓库文档使用 MIT License 开源。
-
-`assets/njust_logo.png`、官方格式原件及其可读转写件不属于 MIT License 授权范围；来源、文件哈希和已知限制见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。本项目不是南京理工大学官方项目，也不表示学校背书。用户自行提供的 logo、校徽或其他第三方素材同样不包含在本许可证范围内。
+- 可最小复现的 Markdown；
+- 使用的操作系统以及 Pandoc、Tectonic/XeLaTeX 版本；
+- 终端错误信息；
+- `latex/prepare_report.json` 和 `latex/postprocess_qa.json` 中与问题有关的字段；
+- 不包含个人信息的 PDF 页面截图。
